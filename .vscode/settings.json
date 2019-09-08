@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "unistd.h": "c",
+        "stat.h": "c",
+        "string.h": "c",
+        "fcntl.h": "c",
+        "*.tcc": "c",
+        "fstream": "c"
+    },
+    "C_Cpp.errorSquiggles": "Enabled"
+}
