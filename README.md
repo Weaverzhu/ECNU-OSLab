@@ -384,7 +384,28 @@ pattern { action }
 
 这个问题用编程语言是很容易的，放入二维数组中，循环变量打印出就行。
 
-`awk` 恰好可以“复制”我们想要的功能
+`awk` 恰好可以“复制”我们想要的功能，使用类似 `c` 语言风格的循环和 `[,]` 风格的二维数组，我们可以和编程语言中一样完成任务。
+
+```sh
+awk '
+    {
+        for (i=1; i<=NF; i=i+1) {
+            line[NR, i] = $i
+        }
+        # store the data in a 2d array
+    }
+    
+    END {
+        for (i=1; i<=NF; i=i+1) {
+            for (j=1; j<=NR; j=j+1) {
+                printf("%s ", line[j,i])
+            }
+            print ""
+        }
+        # print the elements just like we program in C
+    }' input
+
+```
 
 
 ## 0b
