@@ -21,11 +21,17 @@ rec_t* makeUpNewRoom(rec_t *arr, int *plen) {
     int len = *plen;
     if (len) {
         tmp = (rec_t*)malloc(sizeof(rec_t) * len);
+        if (tmp == NULL) {
+            err("Error: failed to allocate memory.");
+        }
         memcpy(tmp, arr, sizeof(rec_t) * len); // move to tmp
         free(arr);
     }
     
     arr = (rec_t*)malloc(sizeof(rec_t) * (len + BLOCK)); // allocate a bigger array
+    if (arr == NULL) {
+        err("Error: failed to allocate memory.");
+    }
     if (len) {
         memcpy(arr, tmp, sizeof(rec_t) * len);
         free(tmp); // clear the tmp
@@ -54,8 +60,9 @@ int cmp(const void *a, const void *b) {
 
 int main(int argc, char const *argv[])
 {
-    char *outFile = strdup(noSuchFile), c, *inputFile = strdup(noSuchFile);
+    char *outFile = strdup(noSuchFile), *inputFile = strdup(noSuchFile);
 
+    
 
     if (argc != 3) usage();
     outFile = strdup(argv[2]);
@@ -76,25 +83,24 @@ int main(int argc, char const *argv[])
     }
 
 
-    rec_t *arr, r;
+    rec_t *arr = NULL, r;
     int len = 0, size = 0;
     
     arr = makeUpNewRoom(arr, &len);
-    if (arr == NULL) {
-        puts("FUCK");
-        return 0;
-    }
     int rd;
     while (1) {
         rd = read(inputfd, &r, sizeof(rec_t));
         if (rd == 0) break; // EOF
+        else if (rd != sizeof(rec_t))
+            err("Error: failed to read valid data");
         if (size == len) arr = makeUpNewRoom(arr, &len);
         arr[size++] = r;
-        
     }
     qsort(arr, size, sizeof(arr[0]), cmp);
     for (int i=0; i<size; ++i) {
-        write(outputfd, &arr[i], sizeof(rec_t));
+        int wd = write(outputfd, &arr[i], sizeof(rec_t));
+        if (wd != sizeof(rec_t))
+            err("Error: failed to write data");
     }
     close(inputfd);
     close(outputfd);

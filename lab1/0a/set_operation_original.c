@@ -23,7 +23,7 @@ int check(int num, struct node *head){
   struct node *p;
   p=head;
   while(p!=NULL){
-    if((p->->next)->number==num) 
+    if((p)->number==num) 
       sign=1;
     p=p->next;  
   }
@@ -86,7 +86,7 @@ int main(){
   A2_head=NULL;
   p3=A_head;
   p1=A2_head;
-  for(i=0;i<=A_size;i++){
+  for(i=0;i<A_size;i++){
     p2=(struct node*)malloc(LEN);
     p2->number=p3->number;
     if(sign==0){

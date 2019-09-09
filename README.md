@@ -166,7 +166,26 @@ linux 的文件分别有对三个对象的文件权限说明，分别是 `user`,
 $ gcc --help
 ```
 
++ `-o`
+
 一般来说，直接运行程序的话，我们直接运行 `$ gcc [sourcefile] -o [outputfile]`，然后运行 `$ ./outputfile [arg]` 即可。若没有 `-o` 选项，则输出文件为 `a.out`
+
++ `-O`
+
+之后比较常用的选项是 `-O`，表示为 `Opitmization` 进行编译优化。很多情况开 `-O2` 编译优化可以让程序的运行速度快上四倍左右
+
++ `-g`
+
+若要进行 `gdb` 调试，则需要加上该选项。不过一般不和 `-O` 选项一起用。自己以前这么用到的时候，会发现程序会自动过滤一些可以优化掉的代码部分，比如空循环。
+
++ `-Wall`
+
+输出额外的编译警告，如 `scanf` 用错格式符，或者是函数没加返回值，变量没有初始化等。
+
++ `-std`
+
+在老的 `gcc` 编译器上，c语言用的是老的语法标准，甚至没有 `for` 循环的语法。一般习惯使用 `-std=c11`。这里使用的是 `gcc-7`，故不会出现此问题。
+
 
 #### 大致过程
 
@@ -194,4 +213,314 @@ $ gcc --help
       if(!check(p1->number,A2_head)){
       ```
       `check()` 在包含元素返回真，那么这里代码搞反了真假的条件
+
+#### gdb
+
+以下是使用 `gdb` 的方法调试程序。
+
+首先第一个错误的地方可以通过编译程序的返回错误信息看到。
+
+通过编译选项 `-g`，可以生成调试信息。
+
+```sh
+$ gcc set_operation.c -o set_operation -g
+```
+
+从 [gdb documentatin](http://www.gnu.org/software/gdb/documentation/) 上我们可以看到 gdb 的 user manual
+
+```
+$ break location
+```
+
+其中 location 可以是行号，函数名或者是一条指令的地址。
+
+```sh
+$gdb set_operation
+(gdb) run
+```
+
+使用 `gdb` 运行程序
+
+```sh
+Starting program: /root/ECNU-OSLab/lab1/0a/set 
+---------------------------------
+----Computing (A-B)union(B-A)----
+---------------------------------
+----input the number of elements of A: 3
+1-th element: 3
+2-th element: 4
+3-th element: 5
+----input the number of elements of B: 2
+1-th element: 1
+2-th element: 4
+
+Program received signal SIGSEGV, Segmentation fault.
+0x0000000000400970 in main () at set_operation_original.c:91
+91          p2->number=p3->number;
+```
+
+程序自动在 `Segmentation fault` 的地方断点，接着我们在这个地方设置 `display` 和 `break point`，这里一共显示 `i,p2,p2->number,p3,p3->number`
+
+```sh
+(gdb) break 91
+Breakpoint 1 at 0x40096c: file set_operation_original.c, line 91.
+Breakpoint 1, main () at set_operation_original.c:91
+91          p2->number=p3->number;
+(gdb) display i
+1: i = 0
+(gdb) display p2
+2: p2 = (struct node *) 0x6038d0
+(gdb) display p2->number
+3: p2->number = 0
+(gdb) display p3
+4: p3 = (struct node *) 0x603830
+(gdb) display p3->number
+5: p3->number = 1
+(gdb) run
+The program being debugged has been started already.
+Start it from the beginning? (y or n) n
+Program not restarted.
+(gdb) info display
+Auto-display expressions now in effect:
+Num Enb Expression
+1:   y  i
+2:   y  p2
+3:   y  p2->number
+4:   y  p3
+5:   y  p3->number
+(gdb) continue
+Continuing.
+
+Breakpoint 1, main () at set_operation_original.c:91
+91          p2->number=p3->number;
+1: i = 1
+2: p2 = (struct node *) 0x6038f0
+3: p2->number = 0
+4: p3 = (struct node *) 0x603850
+5: p3->number = 2
+(gdb) continue
+Continuing.
+
+Breakpoint 1, main () at set_operation_original.c:91
+91          p2->number=p3->number;
+1: i = 2
+2: p2 = (struct node *) 0x603910
+3: p2->number = 0
+4: p3 = (struct node *) 0x603870
+5: p3->number = 3
+(gdb) continue
+Continuing.
+
+Breakpoint 1, main () at set_operation_original.c:91
+91          p2->number=p3->number;
+1: i = 3
+2: p2 = (struct node *) 0x603930
+3: p2->number = 0
+4: p3 = (struct node *) 0x0
+5: p3->number = <error: Cannot access memory at address 0x0>
+(gdb) 
+```
+
+使用 `continue` 继续到下一个断点， `display` 信息会在每次遇到断点的时候跳出，也可以使用 `print [expression]` 打印信息。
+
+我们可以发现，在第四次到断点的时候 `p3` 变成了 `NULL`，于是发现循环多执行了一次，遂发现 89 行的错误。
+
+接着我们可以发现 $(A-B)$ 和 $(B-A)$ 的计算结果有误，我们分别在第 107 和 第 118 行设置断点，分别是两种情况的地方。
+
+```sh
+(gdb) b 107
+Breakpoint 1 at 0x4009ea: file set_operation_original.c, line 107.
+(gdb) b 118
+Breakpoint 2 at 0x400a44: file set_operation_original.c, line 118.
+(gdb) continue
+The program is not being run.
+(gdb) run
+Starting program: /root/ECNU-OSLab/lab1/0a/set 
+---------------------------------
+----Computing (A-B)union(B-A)----
+---------------------------------
+----input the number of elements of A: 3
+1-th element: 1
+2-th element: 2
+3-th element: 3
+----input the number of elements of B: 2
+1-th element: 1
+2-th element: 4
+
+Breakpoint 1, main () at set_operation_original.c:107
+107         if(!check(p1->number,B_head)){ //if this element is in B
+(gdb) display i
+1: i = 0
+(gdb) display p1->number
+2: p1->number = 1
+(gdb) continue
+Continuing.
+
+Breakpoint 2, main () at set_operation_original.c:118
+118              if(sign==0){
+1: i = 0
+2: p1->number = 1
+```
+
+发现 `1` 本来在链表中，却跳到118行这里，和预期正好相反，肯定是 `check` 部分有误，发现布尔值弄反了。
+
+### Bonus 1
+
+从 [https://awk.readthedocs.io/en/latest/chapter-one.html](https://awk.readthedocs.io/en/latest/chapter-one.html) 上能看到中文且比较简练的 `awk` 使用教程
+
+```
+pattern { action }
+```
+
+`awk` 程序组成比较简练，模式 + 行为，我们可以按照自己的行为处理文本信息。
+
+这里我们需要用到的是内建变量 `$NR`，它能告诉我们当前处理的是第几行。
+
+显然我们只需要加上判断语句 `$NR == x` 就能输出第 x 行了。
+
+### Bonus 2
+
+这个问题用编程语言是很容易的，放入二维数组中，循环变量打印出就行。
+
+`awk` 恰好可以“复制”我们想要的功能
+
+
+## 0b
+
+对二进制文件进行读写操作，使用系统调用。
+
+使用 `man` 指令，可以得知各种系统调用的信息。
+
+```
+man 2 open
+man 2 read
+man 2 close
+man 2 write
+```
+
+事实上，我们需要用到的行为和 `./dump.c` 与 `./generator.c` 中的用法非常类似，学习这两个程序中的用法也不失为一种好的方法。
+
+这里实现了一个类似cpp中 `std::vector<>` 的可变长数组，读入结构体，调用 `qsort`，排序后输出。
+
+### 错误信息处理
+
+```c
+void usage()
+{
+	fprintf(stderr, "Usage: fastsort inputfile outputfile\n");
+	exit(1);
+}
+
+void err(char *msg) {
+	fprintf(stderr, "%s\n", msg);
+	exit(1);
+}
+```
+
+`usage` 用来提醒用户正确的参数输入
+`err`用来输出错误信息并返回值 `1`
+
+### open
+
++ 用法
+
+```c
+int open(const char *pathname, int flags);
+```
+
+其中第一个参数为文件名，第二个参数为选项。
+
+可以使用 `or` 运算添加多个选线，这里的选线为 `O_WRONLY` 只写， `O_RDONLY` 只读，`O_CREAT` 如果没有图像即创建，`O_TRUNC` 如果已有文件，则将之清空。`S_IRWXU` 表示创建的文件用户拥有读取写入和执行的权限。
+
+```c
+if (argc != 3) usage();
+outFile = strdup(argv[2]);
+inputFile = strdup(argv[1]);
+
+int inputfd = open(inputFile, O_RDONLY);
+
+if (inputfd < 0) {
+      sprintf(msg, "Error: Cannot open file %s\n", inputFile);
+      err("failed to open inputfile");
+}
+
+int outputfd = open(outFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
+
+if (outputfd < 0) {
+      sprintf(msg, "Error: Cannot open file %s\n", outFile);
+      err(msg);
+}
+```
+
+`open` 函数会返回一个 `file descriptor`，一个整数表示文件。一般来说返回值会从 3 开始，因为默认会打开两个文件流 `stdin,stdout,stderr`
+
+### read
+
+```c
+ssize_t read(int fd, void *buf, size_t count);
+```
+
+返回读取的字节大小，如果遇到 `EOF` 返回0，将数据读入 `*buf` 中
+
+我们可以认为如果读取到的结果不等于 `EOF` 或 `sizeof(rec_)`，那么输入的数据是不合法的
+
+```c
+int rd;
+while (1) {
+      rd = read(inputfd, &r, sizeof(rec_t));
+      if (rd == 0) break; // EOF
+      else if (rd != sizeof(rec_t))
+      err("Error: failed to read valid data");
+      if (size == len) arr = makeUpNewRoom(arr, &len);
+      arr[size++] = r;
+}
+```
+### write
+
+```c
+ssize_t write(int fd, const void *buf, size_t count);
+```
+
+与 `read` 类似返回成功读取的字节数，当我们写入 `rec_t` 类型数据如果返回值不是 `sizeof(rec_t)`，我们应该认为写入文件失败。
+
+```c
+for (int i=0; i<size; ++i) {
+      int wd = write(outputfd, &arr[i], sizeof(rec_t));
+      if (wd != sizeof(rec_t))
+      err("Error: failed to write data");
+}
+```
+
+### vector
+
+如果数组中元素已经到达最大元素，则重新分配一个大数组
+
+当 `malloc` 返回 `NULL`时，分配内存失败，这也是需要报出异常的情况。
+
+```c
+rec_t* makeUpNewRoom(rec_t *arr, int *plen) {
+    static rec_t *tmp;
+    int len = *plen;
+    if (len) {
+        tmp = (rec_t*)malloc(sizeof(rec_t) * len);
+        if (tmp == NULL) {
+            err("Error: failed to allocate memory.");
+        }
+        memcpy(tmp, arr, sizeof(rec_t) * len); // move to tmp
+        free(arr);
+    }
+    
+    arr = (rec_t*)malloc(sizeof(rec_t) * (len + BLOCK)); // allocate a bigger array
+    if (arr == NULL) {
+        err("Error: failed to allocate memory.");
+    }
+    if (len) {
+        memcpy(arr, tmp, sizeof(rec_t) * len);
+        free(tmp); // clear the tmp
+    }
+    *plen = len + BLOCK;
+    return arr;
+}
+```
+
 
