@@ -4,6 +4,8 @@
 
 这个项目包含两个部分，第一部分主要有 `shell` 脚本完成一些基本的操作，而第二部分由 `linux` 下 `C` 语言编程完成一些基本的操作。在 `bonus` 部分，使用一些高级的文本处理工具完成人物。
 
+学习`linux shell` 非常简单，网上有大量博客讲解。我个人比较喜欢的是使用 `man` 指令和查阅 `gnu` 网站上的非常详细的文档 [http://www.gnu.org/software/coreutils/manual/coreutils](http://www.gnu.org/software/coreutils/manual/coreutils)
+
 ## 0a
 
 ### Part 1
