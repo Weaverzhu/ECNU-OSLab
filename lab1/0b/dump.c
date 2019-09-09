@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
 	{
 		int rc;
 		rc = read(fd, &r, sizeof(rec_t));
+		printf("%d\n", rc);
 		if (rc == 0) // 0 indicates EOF
 			break;
 		if (rc < 0)

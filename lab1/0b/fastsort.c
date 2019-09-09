@@ -16,14 +16,22 @@
 
 char msg[100];
 
-int makeUpNewRoom(rec_t *arr, int len) {
+rec_t* makeUpNewRoom(rec_t *arr, int *plen) {
     static rec_t *tmp;
-    tmp = (rec_t*)malloc(sizeof(rec_t) * len);
-    memcpy(tmp, arr, sizeof(rec_t) * len);
-    free(arr);
-    arr = malloc(sizeof(rec_t) * (len + BLOCK));
-    free(tmp);
-    return len + BLOCK;
+    int len = *plen;
+    if (len) {
+        tmp = (rec_t*)malloc(sizeof(rec_t) * len);
+        memcpy(tmp, arr, sizeof(rec_t) * len); // move to tmp
+        free(arr);
+    }
+    
+    arr = (rec_t*)malloc(sizeof(rec_t) * (len + BLOCK)); // allocate a bigger array
+    if (len) {
+        memcpy(arr, tmp, sizeof(rec_t) * len);
+        free(tmp); // clear the tmp
+    }
+    *plen = len + BLOCK;
+    return arr;
 }
 
 const char noSuchFile[] = "/no/such/file";
@@ -39,15 +47,21 @@ void err(char *msg) {
 	exit(1);
 }
 
+int cmp(const void *a, const void *b) {
+    rec_t *pa = (rec_t*)a, *pb = (rec_t*)b;
+    return pa->key - pb->key;
+}
 
 int main(int argc, char const *argv[])
 {
     char *outFile = strdup(noSuchFile), c, *inputFile = strdup(noSuchFile);
-    if (argc != 2) usage();
+
+
+    if (argc != 3) usage();
     outFile = strdup(argv[2]);
     inputFile = strdup(argv[1]);
 
-    int inputfd = open(inputFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
+    int inputfd = open(inputFile, O_RDONLY);
 
     if (inputfd < 0) {
         sprintf(msg, "Error: Cannot open file %s\n", inputFile);
@@ -61,16 +75,30 @@ int main(int argc, char const *argv[])
         err(msg);
     }
 
+
     rec_t *arr, r;
     int len = 0, size = 0;
-    len = makeUpNewRoom(arr, len);
+    
+    arr = makeUpNewRoom(arr, &len);
+    if (arr == NULL) {
+        puts("FUCK");
+        return 0;
+    }
     int rd;
     while (1) {
         rd = read(inputfd, &r, sizeof(rec_t));
         if (rd == 0) break; // EOF
+        if (size == len) arr = makeUpNewRoom(arr, &len);
+        arr[size++] = r;
         
     }
-    
-
+    qsort(arr, size, sizeof(arr[0]), cmp);
+    for (int i=0; i<size; ++i) {
+        write(outputfd, &arr[i], sizeof(rec_t));
+    }
+    close(inputfd);
+    close(outputfd);
+    // puts("completed");
+    fprintf(stderr, "sort completed\n");
     return 0;
 }

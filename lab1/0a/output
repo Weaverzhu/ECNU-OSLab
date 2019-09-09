@@ -1,12 +1,4 @@
 bash root -rwxr-xr-x
-btrfs root -rwxr-xr-x
-btrfs-debug-tree root -rwxr-xr-x
-btrfs-find-root root -rwxr-xr-x
-btrfs-image root -rwxr-xr-x
-btrfs-map-logical root -rwxr-xr-x
-btrfs-select-super root -rwxr-xr-x
-btrfs-zero-log root -rwxr-xr-x
-btrfstune root -rwxr-xr-x
 bunzip2 root -rwxr-xr-x
 busybox root -rwxr-xr-x
 bzcat root -rwxr-xr-x
