@@ -78,11 +78,12 @@ cp [OPTION]... -t DIRECTORY SOURCE...
 
 #### 大致思路
 
-1. 使用 `find` 查找 `b` 开头文件
+1. 使用 `find` 查找 `b` 开头文件，并且发现已经按要求排好序
 2. 使用 `ls -l` 列出完整信息
 3. 使用 `awk` 输出特定的列
 4. 使用 `pipeline`  组合这些程序的输入输出
 5. 使用 `sed` 对调整格式
+6. 会输出到 `./outfile
 
 #### rm
 
@@ -107,7 +108,7 @@ rm [OPTION]... [FILE]...
        [expression]
 ```
 
-使用的第一个选项为 `-iname`，用来匹配 `b` 字母文件名开头的文件
+使用的第一个选项为 `-iname`，用来匹配 `b` 字母文件名开头的文件且不忽略大小写
 
 ```
 -iname pattern
