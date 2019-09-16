@@ -16,10 +16,17 @@ void test() {
 
 int main(int argc, char const *argv[])
 {
-    
+    stdOriginFd = dup(STDOUT_FILENO);
+
+    #ifdef TEST
     test();
-   
+    #endif
+    
+    char curDir[100];
+    chdir(getcwd(curDir, 100));
+
     while (1) {
+        dup2(stdOriginFd, STDOUT_FILENO);
         printf("mysh>");
         static char s[CARRIGE_SIZE];
         fgets(s, CARRIGE_SIZE, stdin);
