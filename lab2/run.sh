@@ -1,2 +1,2 @@
-./compile.sh $1
-./a.out
+make
+./mysh
