@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include <unistd.h>
-const int CARRIGE_SIZE = 512;
+#define CARRIGE_SIZE 512
 
 // ===============utils==================
 
@@ -34,54 +34,61 @@ char *strcopy(char *b) {
 // ===============main===================
 
 typedef struct Cmd {
-    char *cmdName;
     int argc;
     char **argv;
 } Cmd; 
 
 
+
+
 Cmd* newCommand(char *cmdName) {
-    Cmd* res = (Cmd*)malloc(sizeof(Cmd));
-    res->cmdName = strcopy(cmdName);
-    printf("%s\n", res->cmdName);
+    // quote isn't allowed
+    static char buf[CARRIGE_SIZE][CARRIGE_SIZE+1];
+
+
+    char *localcmd = strcopy(cmdName);
+    Cmd *res = (Cmd*)malloc(sizeof(Cmd));
+    char *token, *delim = " \n", *saveptr;
     res->argc = 0;
-    res->argv = malloc(sizeof(char*) * (res->argc + 2));
-    res->argv[0] = strcopy(cmdName);
-    //The first argument, by convention, should point to the filename associated with the file being  executed.
-    res->argv[res->argc + 1] = NULL;
-    // argument list should be NULL terminated according to the manual page of exec()
+    printf("%s %s\n", localcmd, delim);
+    for (char *s=localcmd; ; s=NULL) {
+        token = strtok_r(s, delim, &saveptr);
+        if (token == NULL) break;
+        memcpy(buf[res->argc++], token, sizeof(char) * (strlen(token) + 1));
+    }
+    res->argv = (char**)malloc(sizeof(char*) * (res->argc+1));
+    
+    for (int i=0; i<res->argc; ++i) {
+        res->argv[i] = strcopy(buf[i]);
+    }
+    res->argv[res->argc] = NULL;
+    
     return res;
 }
 
 int run(Cmd *c) {
-    return execvp(c->cmdName, c->argv);
+    return execvp(c->argv[0], c->argv);
 }
 
-int runtest(Cmd *c) {
-    return system(c->cmdName);
-}
+// int runtest(Cmd *c) {
+//     return system(c);
+// }
 
 void testargv(char *cmd) {
-    msg(cmd);
-    char *token;
-    const char* delim = ":;";
-    msg("FUCK\n");
-    char *saveptr;
-    token = strtok_r(cmd, delim, &saveptr);
-    printf("%s\n", token);
-    // for (char *s = cmd; ; s = NULL) {
-    //     if (s != NULL) printf("%s %s\n", s, delim);
-    //     token = strtok_r(s, delim, &saveptr);
-    //     if (token == NULL) break;
-    //     printf("%s\n", token);
-    // }
+    char *token, *localcmd = strcopy(cmd), *saveptr;
+    const char* delim = " \n";
+
+    for (char *s=localcmd;; s=NULL) {
+        token = strtok_r(s, delim, &saveptr);
+        if (token==NULL) break;
+        printf("%s\n", token);
+    }
 }
 
 int main(int argc, char const *argv[])
 {
-    char cmd[] = "a/bbb///cc;xxx:yyy:";
-    char *token = strtok(cmd, ":;");
-    // testargv(cmd);
+    Cmd *cmd = newCommand("ls -l");
+    run(cmd);
     return 0;
 }
 
