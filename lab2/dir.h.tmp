@@ -1,7 +1,6 @@
 #ifndef _DIR_H
 #define _DIR_H
 #include "config.h"
-#include "util.h"
 typedef struct {
     char **dirs;
 } Dir;
