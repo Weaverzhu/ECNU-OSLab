@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #define CARRIGE_SIZE 512
-
+#define SIZE 512
 #define C_SIZE 100
 
 #define DEBUG

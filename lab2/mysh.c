@@ -16,7 +16,7 @@ void test() {
 
 int main(int argc, char const *argv[])
 {
-    stdOriginFd = dup(STDOUT_FILENO);
+    stdoutOriginFd = dup(STDOUT_FILENO);
 
     #ifdef TEST
     test();
@@ -24,14 +24,14 @@ int main(int argc, char const *argv[])
     
     char curDir[100];
     chdir(getcwd(curDir, 100));
-    write(stdOriginFd, SHELL_HEADER, strlen(SHELL_HEADER));
+    write(stdoutOriginFd, SHELL_HEADER, strlen(SHELL_HEADER));
     while (1) {
-        dup2(stdOriginFd, STDOUT_FILENO);
+        dup2(stdoutOriginFd, STDOUT_FILENO);
         static char s[CARRIGE_SIZE];
         fgets(s, CARRIGE_SIZE, stdin);
         Cmd *cmd = newCommand(s);
-        run(cmd);
-        write(stdOriginFd, SHELL_HEADER, strlen(SHELL_HEADER));
+        run(cmd); 
+        write(stdoutOriginFd, SHELL_HEADER, strlen(SHELL_HEADER));
     }
     
     return 0;

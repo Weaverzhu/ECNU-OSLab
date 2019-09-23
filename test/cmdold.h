@@ -152,7 +152,7 @@ Cmd* newCommand(char *cmdName) {
     }
 /////////////////////////////////////////////////////////////////
     #ifdef DEBUG
-        // fprintf(stderr, "argc: %d\n", res->argc);
+        fprintf(stderr, "argc: %d\n", res->argc);
         for (int i=1; i<=res->argc; ++i) {
             fprintf(stderr, "%d %s\n", i, res->argv[i]);
         }
@@ -209,11 +209,11 @@ CmdList* insertCmd(CmdList* head, Cmd *c) {
         return head;
     }
     else {
-        for (CmdList* next=head->next; next!=NULL; next=next->next) {
-            next = (CmdList*)malloc(sizeof(CmdList));
-            next->data = c;
-            next->next = NULL;
-        }
+        CmdList *next;
+        for (next=head; next->next!=NULL; next=next->next);
+        CmdList *res = (CmdList*)malloc(sizeof(CmdList));
+        res->data = c; res->next = NULL;
+        next->next = res;
         return head;
     }
 }

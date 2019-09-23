@@ -5,7 +5,8 @@
         "string.h": "c",
         "fcntl.h": "c",
         "*.tcc": "c",
-        "fstream": "c"
+        "fstream": "c",
+        "pipe.h": "c"
     },
     "C_Cpp.errorSquiggles": "Enabled"
 }
