@@ -7,6 +7,7 @@ char **parse(char *str, const char *delim) {
     int count = 0;
     for (char *s=localstr; ; s=NULL) {
         token = strtok_r(s, delim, &saveptr);
+        if (strlen(token) == 0) continue;
         strcpy(buf[count++], token);
     }
     char **res = allocate(char**, count+1);
