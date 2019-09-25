@@ -16,6 +16,6 @@ typedef struct Pipe {
 
 Pipe *newPipe();
 int configurePipe(Pipe *p, pid_t cpid, int isFatherRead);
-int pipeRead(Pipe *p);
+int pipeRead(Pipe *p, char *buf);
 int pipeWrite(Pipe *p, char *buf);
 #endif

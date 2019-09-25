@@ -30,8 +30,8 @@ int configurePipe(Pipe *p, pid_t cpid, int isFatherRead) {
     }
 }
 
-int pipeRead(Pipe *p) {
-    return read(p->pipefd[0], p->data, PIPESIZE);
+int pipeRead(Pipe *p, char *buf) {
+    return read(p->pipefd[0], buf, PIPESIZE);
 }
 
 int pipeWrite(Pipe *p, char *buf) {
