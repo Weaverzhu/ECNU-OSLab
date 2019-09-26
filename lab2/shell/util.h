@@ -4,6 +4,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <fcntl.h>
+
+extern int ORIGIN_STDOUT_FILENO;
 
 #define allocate(type, size) (type*)malloc(sizeof(type) * size)
 #define match(a, b) (strcmp(a, b) == 0)

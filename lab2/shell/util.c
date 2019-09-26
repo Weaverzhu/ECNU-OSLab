@@ -1,6 +1,8 @@
 #include "util.h"
 #include "config.h"
 
+int ORIGIN_STDOUT_FILENO;
+
 char **parse(char *str, const char *delim, int allowEmpty) {
     dbg("parse started");
     char *localstr = strdup(str), *token, *saveptr;
