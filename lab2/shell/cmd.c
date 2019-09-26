@@ -27,7 +27,7 @@ Cmd *newCommand(char *cmdstr) {
     #endif
 
     Cmd *res = allocate(Cmd, 1);
-    res->argv = parse(cmdstr, " \n");
+    res->argv = parse(cmdstr, " \n", 1);
     res->read = res->write = NULL;
     res->bgpid = 0;
     return res;
@@ -37,19 +37,30 @@ Cmd *newCommand(char *cmdstr) {
 int isBackground;
 CmdList *parseLine(char *cmdline) {
     isBackground = 0;
-    char **cmdstr = parse(cmdline, "|\n");
-    for (int i=0; cmdstr[i]!=NULL; ++i) {
-        if (match(cmdstr[i], "&")) {
-            if (cmdstr[i+1] == NULL) {
-                free(cmdstr[i]);
-                isBackground = 1;
-                break;
-            } else {
-                return NULL;
-            }
-        }
+    trim(cmdline);
+    #ifdef DEBUG
+    dbg("after trim:");
+    setred;
+    fprintf(stderr, "after trim, cmd is %s\n", cmdline);
+    setwhite;
+    #endif
+
+    char *note = strchr(cmdline, '&');
+    if (note == NULL || note == (cmdline + strlen(cmdline))) { // & not found
+        dbg("& not found");
+        isBackground = 0;
+    } else if (note != NULL && (cmdline + strlen(cmdline) - note) > 1) { // & not at the end of cmd
+        return NULL;
+    } else if (note != NULL) { // set background
+        dbg("this cmd is background cmd");
+        *note = 0;
+        isBackground = 1;
     }
-    CmdList *head = NULL;;
+
+    char **cmdstr = parse(cmdline, "|\n", 0);
+    if (cmdstr == NULL) return NULL;
+    
+    CmdList *head = NULL;
     for (int i=0; cmdstr[i]!=NULL; ++i){
         Cmd *newcmd = newCommand(cmdstr[i]);
         head = insertCmd(head, newcmd);
@@ -126,8 +137,6 @@ int runCommand(Cmd *c) {
                 insertCmd(bghead, c);
             } else {
                 waitpid(cpid, NULL, 0);
-                for (CmdList *t=bghead; t!=NULL; t=t->next)
-                    waitpid(t->data->bgpid, NULL, 0);
             }
         }
     } else return -1;

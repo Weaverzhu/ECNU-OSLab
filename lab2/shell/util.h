@@ -7,10 +7,12 @@
 
 #define allocate(type, size) (type*)malloc(sizeof(type) * size)
 #define match(a, b) (strcmp(a, b) == 0)
-char **parse(char *str, const char *delim);
+char **parse(char *str, const char *delim, int allowEmpty);
 void dbg(char *s);
+void trim(char *s);
 
 #define setgreen fprintf(stderr, "\033[32;1m");
 #define setwhite fprintf(stderr, "\033[39;0m");
+#define setred fprintf(stderr, "\033[31;1m")
 
 #endif

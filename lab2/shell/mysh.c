@@ -14,7 +14,33 @@ int main(int argc, char const *argv[])
         static char cmdline[SIZE];
         PRINT_HEADER;
         memset(cmdline, 0, sizeof cmdline);
-        read(STDIN_FILENO, cmdline, SIZE);
+        int ret = read(STDIN_FILENO, cmdline, SIZE);
+        if (ret == -1) {
+            REPORT_ERR;
+            continue;
+        } else if (ret == 1) {
+            dbg("empty command");
+            continue;
+        }
+        CmdList *head = parseLine(cmdline);
+        if (head == NULL) {
+            REPORT_ERR;
+            continue;
+        }
+
+        #ifdef DEBUG
+        dbg("=========\nshow cmds: ");
+        setred;
+        int count = 0;
+        // dbg("pipe cmds:");
+        for (CmdList *t=head; t!=NULL; t=t->next) {
+            fprintf(stderr, "[%d] %s ...\n", count++, t->data->argv[0]);
+        }
+        setwhite;
+        dbg("=========");
+        #endif
+
+
         Cmd *c = newCommand(cmdline);
         dbg("newcommand completed");
         if (c == NULL) {
