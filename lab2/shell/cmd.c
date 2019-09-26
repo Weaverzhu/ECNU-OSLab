@@ -5,9 +5,10 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include "config.h"
 
 CmdList *insertCmd(CmdList *head, Cmd *c){
-    CmdList *res = allocate(CmdList*, 1); res->data = c; res->next = NULL;
+    CmdList *res = allocate(CmdList, 1); res->data = c; res->next = NULL;
     if (head == NULL) {
         return res;
     } else {
@@ -19,8 +20,14 @@ CmdList *insertCmd(CmdList *head, Cmd *c){
 }
 
 Cmd *newCommand(char *cmdstr) {
-    Cmd *res = allocate(Cmd*, 1);
-    res->argv = parse(cmdstr, " ");
+    #ifdef DEBUG
+    setgreen;
+    fprintf(stderr, "start to add new command from str %s\n", cmdstr);
+    setwhite;
+    #endif
+
+    Cmd *res = allocate(Cmd, 1);
+    res->argv = parse(cmdstr, " \n");
     res->read = res->write = NULL;
     res->bgpid = 0;
     return res;
@@ -51,7 +58,16 @@ CmdList *parseLine(char *cmdline) {
 }
 
 int tryBuiltIn(Cmd *c) {
+    dbg("trying builtin");
+    
     char *cmdname = c->argv[0];
+    #ifdef DEBUG
+    setgreen;
+    fprintf(stderr, "cmdname = %s\n", cmdname);
+    setwhite;
+    #endif
+
+
     if (match(cmdname, "exit")) {
         exit(0);
     } else if (match(cmdname, "pwd")) {
@@ -82,14 +98,25 @@ int tryBuiltIn(Cmd *c) {
 
 int runCommand(Cmd *c) {
     int ret = tryBuiltIn(c);
-    if (ret) return 0;
-    else {
+    dbg("tried builtin");
+    if (ret == 1) return 0;
+    else if (ret == 0) {
+        #ifdef DEBUG
+            setgreen;
+            for (int i=0; c->argv[i]!=NULL; ++i)
+                fprintf(stderr, "[%d] |%s|\n", i, c->argv[i]);
+            setwhite;
+        #endif
+
+
         pid_t cpid = fork();
         if (cpid == -1) return -1;
         
         if (cpid == 0) {
             int ret = execvp(c->argv[0], c->argv);
             if (ret == -1) {
+                dbg("error in execvp");
+               
                 REPORT_ERR;
                 exit(-1);
             }
@@ -99,9 +126,11 @@ int runCommand(Cmd *c) {
                 insertCmd(bghead, c);
             } else {
                 waitpid(cpid, NULL, 0);
+                for (CmdList *t=bghead; t!=NULL; t=t->next)
+                    waitpid(t->data->bgpid, NULL, 0);
             }
         }
-    }
+    } else return -1;
     return 0;
 }
 
