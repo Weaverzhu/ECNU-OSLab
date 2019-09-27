@@ -70,7 +70,7 @@ CmdList *parseLine(char *cmdline) {
     return head;
 }
 
-int tryBuiltIn(Cmd *c) {
+int tryBuiltIn(Cmd *c, char *output) {
     dbg("trying builtin");
     
     char *cmdname = c->argv[0];
@@ -85,14 +85,19 @@ int tryBuiltIn(Cmd *c) {
         exit(0);
     } else if (match(cmdname, "pwd")) {
         static char *buf;
-        buf = getcwd(buf, 0);
+        buf = getcwd(buf, SIZE);
+        buf[strlen(buf)] = '\n';
         if (buf == NULL) return -1;
-        write(STDOUT_FILENO, buf, strlen(buf));
+        if (output == NULL) {
+            write(STDOUT_FILENO, buf, strlen(buf));
+            dbg("in tryBuiltIn: output to stdout");
+        } else
+            strcpy(output, buf);
         free(buf);
         return 1;
     } else if (match(cmdname, "cd")) {
         static char *buf;
-        if (c->argv[1] == NULL) buf = getcwd(buf, 0);
+        if (c->argv[1] == NULL) buf = getenv("HOME");
         else buf = c->argv[1];
         int ret = chdir(buf);
         if (ret == -1) return -1;
@@ -110,7 +115,7 @@ int tryBuiltIn(Cmd *c) {
 }
 
 int runCommand(Cmd *c) {
-    int ret = tryBuiltIn(c);
+    int ret = tryBuiltIn(c, NULL);
     dbg("tried builtin");
     if (ret == 1) return 0;
     else if (ret == 0) {
@@ -172,57 +177,64 @@ int tryRedirect(Cmd *c) {
 }
 
 int runCmdWithPipe(CmdList *head) {
-    
     Pipe *last = NULL, *next = NULL;
+    static int lastisbg = 0;
     pid_t cpid;
     for (CmdList *t=head; t!=NULL; t=t->next) { // handle every cmd
-        static char buf[SIZE];
-        int datafrom;
-        if (t == head) {
-            // read(STDIN_FILENO, buf, SIZE);
-            datafrom = STDIN_FILENO;
-        } else {
-            // read(next->pipefd[0], buf, SIZE);
-            datafrom = next->pipefd[0];
-        }
-        int ret = read(datafrom, buf, SIZE);
-        if (ret == -1) return -1;
-
-        // if (t == head) { // the first cmd
-        //     last = NULL;
-        // } else {fa
-        //     last = next;
-        // }
+        static char buf[SIZE]; // buf should be loaded with the last cmd's data
+        last = next;
         next = newPipe();
-        last = newPipe();
 
         Cmd *c = t->data;
 
         if (isBuiltIn(c)) { // handle the cmd in this process when dealing builtin cmds
-            dup2(next->pipefd[0], STDOUT_FILENO);
-            dup2(last->pipefd[0], STDIN_FILENO);
-            int ret = close(next->pipefd[1]);
-            if (ret == -1) return -1;
-            ret = tryBuiltIn(c);
-            if (ret != 1) return -1;
+            dbg("heads up, this is a built-in cmd");
+            if (t->next != NULL) dup2(next->pipefd[0], STDOUT_FILENO); // need to pass output
+            if (last != NULL) dup2(last->pipefd[0], STDIN_FILENO); // need to read data from stdin
 
+            int ret = tryRedirect(c); // try to redirect
+            if (ret == -1) return -1;
+            else if (ret == 1) dbg("redirect successfully");
+            if (t->next == NULL)
+                ret = tryBuiltIn(c, NULL);
+            else
+                ret = tryBuiltIn(c, buf); // write the data to buf
+
+            #ifdef DEBUG
+            setred;
+            fprintf(stderr, "write back: %s\n", buf);
+            setwhite;
+            #endif
+
+            if (ret != 1) return -1;
+            dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO); // reset stdout
+
+            lastisbg = 1;
         } else { // configure pipes, this process will read from child process
+            if (t != head) last = newPipe(); // see if this is the first cmd
+            else last = NULL;
             cpid = fork();
-            int ret = configurePipe(next, 1, cpid);
+            int ret = configurePipe(next, 1, cpid); // shell read data from pipe through `next`
             if (ret == -1) return -1;
-            ret = configurePipe(last, 0, cpid);
-            if (ret == -1) return -1;
+            if (t != head) {
+                ret = configurePipe(last, 0, cpid); // shell pass data to cp through `last `
+                if (ret == -1) return -1;
+            }
             if (cpid == 0) { // in child process
                 dup2(next->pipefd[1], STDOUT_FILENO); // redirect stdin and stdout to pipe
-                dup2(last->pipefd[0], STDIN_FILENO);
+                if (last != NULL) dup2(last->pipefd[0], STDIN_FILENO);
 
                 int ret = tryRedirect(c); // try to redirect
                 if (ret == -1) return -1;
                 ret = execvp(c->argv[0], c->argv); // exec the cmd
                 if (ret == -1) exit(-1);
             } else { // in shell process
-                write(last->pipefd[1], buf, strlen(buf)); // pass data from last process
-            }   
+                if (last != NULL) write(last->pipefd[1], buf, strlen(buf)); // pass data from last process
+                waitpid(cpid, NULL, 0);
+                read(next->pipefd[0], buf, SIZE); // prepare the data for the next cmd
+            }
+
+            lastisbg = 0;
         }
 
         if (t->next != NULL) { // still cmd left to exec
@@ -237,10 +249,40 @@ int runCmdWithPipe(CmdList *head) {
         }
     }
 
-    static char buf[SIZE];
-    // read(next->pipefd[0], buf, SIZE);
-    pipeRead(next, buf);
+    
     dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO); // redirect to normal stdout
+    // read(next->pipefd[0], buf, SIZE);
+    // pipeRead(next, buf);
+    if (!lastisbg) { // output is still in the pipe, fetch it out
+        static char buf[SIZE];
+        int ret;
+        ret = read(next->pipefd[0], buf, SIZE);
+        if (ret == -1) return -1;
+    
+        ret = write(STDOUT_FILENO, buf, strlen(buf));
+        if (ret == -1) return -1;
+    }
     
     return 1;
+}
+
+void outputCmdList(CmdList *head) {
+    const static int ind = 1;
+    for (CmdList *t=head; t!=NULL; t=t->next) {
+        // indent(ind);
+        setindent(ind);
+        outputcmd(t->data);
+    }
+}
+
+void outputcmd(Cmd *c) {
+    #ifdef DEBUG
+    setgreen;
+    fprintf(stderr, "output Cmd %p:\n", c);
+    setred;
+    for (int i=0; c->argv[i]!=NULL; ++i)
+        fprintf(stderr, "%s ", c->argv[i]);
+    puts("");
+    setwhite;
+    #endif
 }

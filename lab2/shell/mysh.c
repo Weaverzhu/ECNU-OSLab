@@ -26,36 +26,22 @@ int main(int argc, char const *argv[])
             continue;
         }
         CmdList *head = parseLine(cmdline); // a bunch of cmds
+
+        #ifdef DEBUG
+        outputCmdList(head);
+        #endif
+
         if (head == NULL) { // go wrong
             REPORT_ERR;
             continue;
         }
-
-        #ifdef DEBUG
-        dbg("=========\nshow cmds: ");
-        setred;
-        int count = 0;
-        // dbg("pipe cmds:");
-        for (CmdList *t=head; t!=NULL; t=t->next) {
-            fprintf(stderr, "[%d] %s ...\n", count++, t->data->argv[0]);
-        }
-        setwhite;
-        dbg("=========");
-        #endif
-
-
-        Cmd *c = newCommand(cmdline);
-        dbg("newcommand completed");
-        if (c == NULL) { // go wrong
-            dbg("new command is null");
+        
+        ret = runCmdWithPipe(head); // show time
+        if (ret == -1)  {
             REPORT_ERR;
-        } else { // it's show time
-            int ret = runCommand(c);
-            if (ret == -1) {
-                REPORT_ERR;
-            }
         }
-        free(c); // clean the things up
+
+        // free(c); // clean the things up
     }
     return 0; 
 }

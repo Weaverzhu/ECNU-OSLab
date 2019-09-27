@@ -18,4 +18,6 @@ void trim(char *s);
 #define setwhite fprintf(stderr, "\033[39;0m");
 #define setred fprintf(stderr, "\033[31;1m")
 
+#define setindent(x) {for (int i=0; i<x; ++i) fprintf(stderr, " ");}
+
 #endif
