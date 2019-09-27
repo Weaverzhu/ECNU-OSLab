@@ -5,7 +5,9 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+
 #include "config.h"
+#include <assert.h>
 
 CmdList *insertCmd(CmdList *head, Cmd *c){
     CmdList *res = allocate(CmdList, 1); res->data = c; res->next = NULL;
@@ -143,3 +145,111 @@ int runCommand(Cmd *c) {
     return 0;
 }
 
+int isBuiltIn(Cmd *c) {
+    char *cmdname = c->argv[0];
+    return match(cmdname, "exit") || match(cmdname, "cd") || match(cmdname, "wait") || match(cmdname, "pwd");
+}
+
+int runCommandWithPipe(Cmd *c, Pipe *last, Pipe *next, pid_t cpid) {
+    if (cpid == 0) { // child process
+        dup2(next->pipefd[1], STDOUT_FILENO); // redirect stdin/stdout
+        dup2(last->pipefd[0], STDIN_FILENO); 
+    } else {
+
+    }
+}
+
+int tryRedirect(Cmd *c) {
+    int argc = 0;
+    int pos = -1;
+    for (; c->argv[argc]!=NULL; ++argc) {
+        if (match(c->argv[argc], ">")) {
+            if (~pos) return -1; // two or more >
+            pos = argc;
+        }
+    }
+    if (~pos) {
+        if (pos != argc-2) 
+            return -1; // > {file} is not at the end of file
+        int fd = open(c->argv[argc-1], WRITE_FILE_MODE);
+        if (fd < 0) return -1; // file open error
+        dup2(fd, STDOUT_FILENO);
+        return 1;
+    }
+    return 0;
+}
+
+int runCmdWithPipe(CmdList *head) {
+    
+    Pipe *last = NULL, *next = NULL;
+    pid_t cpid;
+    for (CmdList *t=head; t!=NULL; t=t->next) { // handle every cmd
+        static char buf[SIZE];
+        int datafrom;
+        if (t == head) {
+            // read(STDIN_FILENO, buf, SIZE);
+            datafrom = STDIN_FILENO;
+        } else {
+            // read(next->pipefd[0], buf, SIZE);
+            datafrom = next->pipefd[0];
+        }
+        int ret = read(datafrom, buf, SIZE);
+        if (ret == -1) return -1;
+
+        // if (t == head) { // the first cmd
+        //     last = NULL;
+        // } else {
+        //     last = next;
+        // }
+
+        next = newPipe();
+        last = newPipe();
+
+        Cmd *c = t->data;
+
+        if (isBuiltIn(c)) { // handle the cmd in this process when dealing builtin cmds
+            dup2(next->pipefd[0], STDOUT_FILENO);
+            dup2(last->pipefd[0], STDIN_FILENO);
+            int ret = close(next->pipefd[1]);
+            if (ret == -1) return -1;
+            int ret = tryBuiltIn(c);
+            if (ret != 1) return -1;
+
+        } else { // configure pipes, this process will read from child process
+            cpid = fork();
+            int ret = configurePipe(next, 1, cpid);
+            if (ret == -1) return -1;
+            ret = configurePipe(last, 0, cpid);
+            if (ret == -1) return -1;
+            if (cpid == 0) { // in child process
+                dup2(next->pipefd[1], STDOUT_FILENO); // redirect stdin and stdout to pipe
+                dup2(last->pipefd[0], STDIN_FILENO);
+
+                int ret = tryRedirect(c); // try to redirect
+                if (ret == -1) return -1;
+                ret = execvp(c->argv[0], c->argv); // exec the cmd
+                if (ret == -1) exit(-1);
+            } else { // in shell process
+                write(last->pipefd[1], buf, strlen(buf)); // pass data from last process
+            }   
+        }
+
+        if (t->next != NULL) { // still cmd left to exec
+            waitpid(cpid, NULL, 0); // wait the current cmd stop to get the output
+        } else {
+            if (isBackground) { // no need to wait for the last cmd to finish
+                c->bgpid = cpid;
+                insertCmd(bghead, c); // add it to the list
+            } else {
+                waitpid(cpid, NULL, 0); // wait as usual
+            }
+        }
+    }
+
+    static buf[SIZE];
+    // read(next->pipefd[0], buf, SIZE);
+    pipeRead(next, buf);
+    dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO); // redirect to normal stdout
+    
+    return 1;
+}
