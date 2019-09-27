@@ -1,5 +1,5 @@
-#ifndef _CMD_H
-#define _CMD_H
+#ifndef _CMD_H_
+#define _CMD_H_
 
 #include "pipe.h"
 #include "config.h"
@@ -25,7 +25,6 @@ int runBackgourndCmd(Cmd *c);
 int runCmdWithPipe(CmdList *head);
 int tryBuiltIn(Cmd *c);
 int runCommand(Cmd *c);
-int runCommandWithPipe(Cmd *c, Pipe *last, Pipe *next, pid_t cpid);
 int isBuiltIn(Cmd *c);
 int tryRedirect(Cmd *c);
 #endif

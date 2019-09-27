@@ -150,14 +150,6 @@ int isBuiltIn(Cmd *c) {
     return match(cmdname, "exit") || match(cmdname, "cd") || match(cmdname, "wait") || match(cmdname, "pwd");
 }
 
-int runCommandWithPipe(Cmd *c, Pipe *last, Pipe *next, pid_t cpid) {
-    if (cpid == 0) { // child process
-        dup2(next->pipefd[1], STDOUT_FILENO); // redirect stdin/stdout
-        dup2(last->pipefd[0], STDIN_FILENO); 
-    } else {
-
-    }
-}
 
 int tryRedirect(Cmd *c) {
     int argc = 0;
@@ -198,10 +190,9 @@ int runCmdWithPipe(CmdList *head) {
 
         // if (t == head) { // the first cmd
         //     last = NULL;
-        // } else {
+        // } else {fa
         //     last = next;
         // }
-
         next = newPipe();
         last = newPipe();
 
@@ -212,7 +203,7 @@ int runCmdWithPipe(CmdList *head) {
             dup2(last->pipefd[0], STDIN_FILENO);
             int ret = close(next->pipefd[1]);
             if (ret == -1) return -1;
-            int ret = tryBuiltIn(c);
+            ret = tryBuiltIn(c);
             if (ret != 1) return -1;
 
         } else { // configure pipes, this process will read from child process
@@ -246,7 +237,7 @@ int runCmdWithPipe(CmdList *head) {
         }
     }
 
-    static buf[SIZE];
+    static char buf[SIZE];
     // read(next->pipefd[0], buf, SIZE);
     pipeRead(next, buf);
     dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO); // redirect to normal stdout

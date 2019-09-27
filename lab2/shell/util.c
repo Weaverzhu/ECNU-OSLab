@@ -34,6 +34,6 @@ void dbg(char *s) {
 
 void trim(char *s) {
     char *back = s + strlen(s)-1;
-    while (back >= s && *back == ' ' || *back == '\n') --back;
+    while (back >= s && (*back == ' ' || *back == '\n')) --back;
     *(back+1) = 0;
 }

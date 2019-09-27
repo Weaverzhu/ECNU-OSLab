@@ -3,9 +3,9 @@
 #include "config.h"
 #include <unistd.h>
 
-Pipe *newpipe() { // return a new pipe pointer
+Pipe *newPipe() { // return a new pipe pointer
     Pipe *res = allocate(Pipe, 1);
-    
+    return res;
 }
 
 int configurePipe(Pipe *p, int fatherRead, pid_t cpid) { // configure pipe for fp and chdp, 0 for suc, -1 for error

@@ -1,5 +1,5 @@
-#ifndef _MYSH_H
-#define _MYSH_H
+#ifndef _MYSH_H_
+#define _MYSH_H_
 
 #include "cmd.h"
 
