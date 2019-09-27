@@ -179,9 +179,10 @@ int tryRedirect(Cmd *c) {
 int runCmdWithPipe(CmdList *head) {
     Pipe *last = NULL, *next = NULL;
     static int lastisbg = 0;
+    static char buf[SIZE]; // buf should be loaded with the last cmd's data
     pid_t cpid;
     for (CmdList *t=head; t!=NULL; t=t->next) { // handle every cmd
-        static char buf[SIZE]; // buf should be loaded with the last cmd's data
+        
         last = next;
         next = newPipe();
 
@@ -220,18 +221,38 @@ int runCmdWithPipe(CmdList *head) {
                 ret = configurePipe(last, 0, cpid); // shell pass data to cp through `last `
                 if (ret == -1) return -1;
             }
+            if (cpid > 0 && t != head) {
+                write(last->pipefd[1], buf, strlen(buf));
+                close(last->pipefd[1]);
+            }
             if (cpid == 0) { // in child process
                 dup2(next->pipefd[1], STDOUT_FILENO); // redirect stdin and stdout to pipe
-                if (last != NULL) dup2(last->pipefd[0], STDIN_FILENO);
+                close(next->pipefd[1]);
+                if (last != NULL) {
+                    dup2(last->pipefd[0], STDIN_FILENO);
+                    close(last->pipefd[0]);
+                }
+
+                #ifdef DEBUG
+                setred;
+                fprintf(stderr, "%d %d %d %d\n", ORIGIN_STDIN_FILENO, STDIN_FILENO, ORIGIN_STDIN_FILENO, STDOUT_FILENO);
+                setwhite;
+                #endif
 
                 int ret = tryRedirect(c); // try to redirect
+                fprintf(stderr, "ret=%d\n", ret);
                 if (ret == -1) return -1;
                 ret = execvp(c->argv[0], c->argv); // exec the cmd
+                close(next->pipefd[1]);
+                dbg("FUCK");
                 if (ret == -1) exit(-1);
             } else { // in shell process
-                if (last != NULL) write(last->pipefd[1], buf, strlen(buf)); // pass data from last process
+                 // pass data from last process
                 waitpid(cpid, NULL, 0);
-                read(next->pipefd[0], buf, SIZE); // prepare the data for the next cmd
+                // close(next->pipefd[0]);
+                int num = read(next->pipefd[0], buf, SIZE); // prepare the data for the next cmd
+                fprintf(stderr, "buf read: %s %d\n", buf, num);
+                close(next->pipefd[0]);
             }
 
             lastisbg = 0;
@@ -254,12 +275,8 @@ int runCmdWithPipe(CmdList *head) {
     // read(next->pipefd[0], buf, SIZE);
     // pipeRead(next, buf);
     if (!lastisbg) { // output is still in the pipe, fetch it out
-        static char buf[SIZE];
-        int ret;
-        ret = read(next->pipefd[0], buf, SIZE);
-        if (ret == -1) return -1;
     
-        ret = write(STDOUT_FILENO, buf, strlen(buf));
+        int ret = write(STDOUT_FILENO, buf, strlen(buf));
         if (ret == -1) return -1;
     }
     

@@ -11,7 +11,8 @@ int main(int argc, char const *argv[])
 {
     dbg("started");
 
-    dup2(STDOUT_FILENO, ORIGIN_STDOUT_FILENO); // make backup for stdout
+    dup2(STDIN_FILENO, ORIGIN_STDIN_FILENO);
+    dup2(STDOUT_FILENO, ORIGIN_STDOUT_FILENO); // make backup for stdin, stdout
 
     while (1) {
         static char cmdline[SIZE];

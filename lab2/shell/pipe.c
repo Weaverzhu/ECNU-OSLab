@@ -1,7 +1,14 @@
 #include "pipe.h"
 #include "util.h"
 #include "config.h"
+#define _GNU_SOURCE             /* See feature_test_macros(7) */
+#include <fcntl.h>              /* Obtain O_* constant definitions */
 #include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <stdio.h>
+#include <string.h>
 
 Pipe *newPipe() { // return a new pipe pointer
     Pipe *res = allocate(Pipe, 1);
@@ -10,10 +17,16 @@ Pipe *newPipe() { // return a new pipe pointer
 
 int configurePipe(Pipe *p, int fatherRead, pid_t cpid) { // configure pipe for fp and chdp, 0 for suc, -1 for error
     pipe(p->pipefd);
-    int openid = 0;
+    
+    int openid = 0; 
     if (fatherRead) openid = 0;
     else openid = 1;
-    if (cpid == 0) openid ^= 1;
+    if (cpid == 0) openid ^= 1; 
+    #ifdef DEBUG
+    setred;
+    fprintf(stderr, "in pid %d, open pipefd[%d]\n", cpid, openid);
+    setwhite;
+    #endif
     return close(p->pipefd[openid ^ 1]);
 }
 

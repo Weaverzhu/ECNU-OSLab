@@ -1,7 +1,7 @@
 #include "util.h"
 #include "config.h"
 
-int ORIGIN_STDOUT_FILENO;
+int ORIGIN_STDOUT_FILENO, ORIGIN_STDIN_FILENO;
 
 char **parse(char *str, const char *delim, int allowEmpty) {
     dbg("parse started");
