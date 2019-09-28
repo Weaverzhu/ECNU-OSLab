@@ -12,6 +12,7 @@
 
 Pipe *newPipe() { // return a new pipe pointer
     Pipe *res = allocate(Pipe, 1);
+    pipe(res->pipefd);
     return res;
 }
 
