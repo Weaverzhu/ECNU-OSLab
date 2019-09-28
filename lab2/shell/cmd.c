@@ -166,12 +166,17 @@ int tryRedirect(Cmd *c) {
         }
     }
     if (~pos) {
+
         if (pos != argc-2) 
             return -1; // > {file} is not at the end of file
+    
         int fd = open(c->argv[argc-1], WRITE_FILE_MODE);
+
+
         if (fd < 0) return -1; // file open error
         dup2(fd, STDOUT_FILENO);
         dbg("FUCK");
+        free(c->argv[pos]); c->argv[pos] = NULL;
         return 1;
     }
     return 0;
@@ -247,12 +252,6 @@ int runCmdWithPipe(CmdList *head) {
         } else { // configure pipes, this process will read from child process
             if (t != head) last = newPipe(); // see if this is the first cmd
             else last = NULL;
-            #ifdef DEBUG
-                setred;
-                outputcmd(c);
-                setwhite;
-            #endif
-            setwhite;
             cpid = fork();
             
             if (cpid == 0) { // in child process
@@ -266,13 +265,8 @@ int runCmdWithPipe(CmdList *head) {
                     dup2(last->pipefd[0], STDIN_FILENO);
                 }
 
-                #ifdef DEBUG
-                setred;
-                fprintf(stderr, "%d %d %d %d %d\n", ORIGIN_STDIN_FILENO, STDIN_FILENO, ORIGIN_STDIN_FILENO, STDOUT_FILENO, next->pipefd[1]);
-                setwhite;
-                #endif
-
                 int ret = tryRedirect(c); // try to redirect
+                outputcmd(c);
                 
                 if (ret == -1) return -1;
                 ret = execvp(c->argv[0], c->argv); // exec the cmd
@@ -333,7 +327,7 @@ void outputcmd(Cmd *c) {
     setred;
     for (int i=0; c->argv[i]!=NULL; ++i)
         fprintf(stderr, "%s ", c->argv[i]);
-    puts("");
+    fprintf(stderr, "\n");
     setwhite;
     #endif
 }
