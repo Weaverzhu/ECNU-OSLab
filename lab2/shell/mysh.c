@@ -38,10 +38,11 @@ int main(int argc, char const *argv[])
         }
         
         ret = runCmdWithPipe(head); // show time
+        // ret = runtest(head);
         if (ret == -1)  {
             REPORT_ERR;
         }
-
+        // exit(0);
         // free(c); // clean the things up
     }
     return 0; 

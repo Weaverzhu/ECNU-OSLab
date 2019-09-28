@@ -28,6 +28,7 @@ int runCommand(Cmd *c);
 int isBuiltIn(Cmd *c);
 int tryRedirect(Cmd *c);
 
+int runtest(CmdList *c);
 void outputCmdList(CmdList *head);
 void outputcmd(Cmd *c);
 #endif

@@ -9,10 +9,5 @@ typedef struct Pipe {
 } Pipe;
 
 Pipe *newPipe();
-int configurePipe(Pipe *p, int fatherRead, pid_t cpid);
-
-// int passOnPipe(Pipe *left, Pipe *right);
-int pipeRead(Pipe *p, char *buf);
-int pipeWrite(Pipe *p, char *buf);
 
 #endif
