@@ -1,0 +1,5 @@
+==========================
+The test files for myshell
+==========================
+
+For example, for the test "background2", look in the "background2/" subdirectory. In most directories you will find 3 files: "in", "out", and "err". Unless otherwise noted by a README file in the test subdirectory, "in" is given as a batch file to your program, and the expected stdout is in "out" while the expected stderr is in "err".
