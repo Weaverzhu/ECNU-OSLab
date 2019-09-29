@@ -182,134 +182,55 @@ int tryRedirect(Cmd *c) {
     return 0;
 }
 
-// int runtest(CmdList *head) {
-//     Cmd *c = head->data;
-//     int ret = 0;
-//     int pipefd[2]; pipe(pipefd);
-//     pid_t cpid = fork();
-//     if (cpid == 0) {
-//         close(pipefd[0]);
-//         dup2(pipefd[1], STDOUT_FILENO);
-//         ret = execvp(c->argv[0], c->argv); // exec the cmd
-//         // printf("FUCK");
-//         // write(pipefd[1], "fuck", strlen("fuck"));
-//         // close(pipefd[1]);
-//         // close(STDOUT_FILENO);
-//         // exit(0);
-//     } else {
-//         close(pipefd[1]);
-//         waitpid(cpid, NULL, 0);
-//         // wait(NULL);
-//         static char buf[PIPE_SIZE];
-//         memset(buf, 0, sizeof buf);
-//         read(pipefd[0], buf, PIPE_SIZE);
-//         int x = write(STDOUT_FILENO, buf, strlen(buf));
-//         write(STDOUT_FILENO, "\t", 1);
-//         // setred;
-//         // fprintf(stderr, "x=%d\n", x);
-//         // setwhite;
-//         close(pipefd[0]);
-//         return 0;
-//     }
-    
-// }
-
-
 int runCmdWithPipe(CmdList *head) {
-    Pipe *last = NULL, *next = NULL;
-    static int lastisbg = 0;
-    static char buf[PIPE_SIZE]; // buf should be loaded with the last cmd's data
-    pid_t cpid;
-    for (CmdList *t=head; t!=NULL; t=t->next) { // handle every cmd
-        
-        last = next;
-        next = newPipe();
+    Pipe *p, *last;
+
+    for (CmdList *t=head; t!=NULL; t=t->next) {
+        p = NULL;
+        if (t->next != NULL) {
+            p = newPipe();
+            t->pright = t->next->pleft = p;
+        }
 
         Cmd *c = t->data;
-
-        if (isBuiltIn(c)) { // handle the cmd in this process when dealing builtin cmds
-            dbg("heads up, this is a built-in cmd");
-            if (t->next != NULL) dup2(next->pipefd[0], STDOUT_FILENO); // need to pass output
-            if (last != NULL) dup2(last->pipefd[0], STDIN_FILENO); // need to read data from stdin
-
-            int ret = tryRedirect(c); // try to redirect
+        if (isBuiltIn(c)) {
+            if (t->pleft != NULL) {
+                closeWrite(t->pleft);
+                dup2(t->pleft->pipefd[0], STDIN_FILENO);
+            }
+            if (t->pright != NULL) {
+                closeRead(t->pright);
+                dup2(t->pright->pipefd[1], STDOUT_FILENO);
+            }
+            int ret = tryRedirect(c);
             if (ret == -1) return -1;
-            else if (ret == 1) dbg("redirect successfully");
-            if (t->next == NULL)
-                ret = tryBuiltIn(c, NULL);
-            else
-                ret = tryBuiltIn(c, buf); // write the data to buf
-
-            #ifdef DEBUG
-            setred;
-            fprintf(stderr, "write back: %s\n", buf);
-            setwhite;
-            #endif
-
-            if (ret != 1) return -1;
-            dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO); // reset stdout
-
-            lastisbg = 1;
-        } else { // configure pipes, this process will read from child process
-            if (t != head) last = newPipe(); // see if this is the first cmd
-            else last = NULL;
-            cpid = fork();
-            
-            if (cpid == 0) { // in child process
-
-                close(next->pipefd[0]);
-                dup2(next->pipefd[1], STDOUT_FILENO); // redirect stdin and stdout to pipe
-                dbg("redirect to next->pipefd[1]");
-                if (t != head) {
-                    dbg("FUCK");
-                    close(last->pipefd[1]);
-                    dup2(last->pipefd[0], STDIN_FILENO);
-                }
-
-                int ret = tryRedirect(c); // try to redirect
-                outputcmd(c);
-                
-                if (ret == -1) return -1;
-                ret = execvp(c->argv[0], c->argv); // exec the cmd
-                close(next->pipefd[1]);
-                exit(-1);
-            } else { // in shell process
-                if (t != head) { // pass data from last process
-                    close(last->pipefd[0]);
-                    write(last->pipefd[1], buf, strlen(buf));
-                    close(last->pipefd[1]);
-                }
-                close(next->pipefd[1]);
-                // waitpid(cpid, NULL, 0);
-                // close(next->pipefd[0]);
-                memset(buf, 0, sizeof buf);
-                int num = read(next->pipefd[0], buf, PIPE_SIZE); // prepare the data for the next cmd
-                close(next->pipefd[0]);
-            }
-
-            lastisbg = 0;
-        }
-
-        if (t->next != NULL) { // still cmd left to exec
-            waitpid(cpid, NULL, 0); // wait the current cmd stop to get the output
+            ret = tryBuiltIn(c, NULL);
+            if (ret == -1) return -1;
         } else {
-            if (isBackground) { // no need to wait for the last cmd to finish
-                c->bgpid = cpid;
-                insertCmd(bghead, c); // add it to the list
+            pid_t cpid = fork();
+            if (cpid == -1) return -1;
+            if (cpid == 0) {
+                if (t->pleft != NULL) {
+                    closeWrite(t->pleft);
+                    dup2(t->pleft->pipefd[0], STDIN_FILENO);
+                }
+                if (t->pright != NULL) {
+                    closeRead(t->pright);
+                    dup2(t->pright->pipefd[1], STDOUT_FILENO);
+                }
+                int ret = tryRedirect(c);
+                if (ret == -1) return -1;
+                ret = execvp(c->argv[0], c->argv);
+                if (ret == -1) return -1;
             } else {
-                waitpid(cpid, NULL, 0); // wait as usual
+                closeBoth(p);
             }
         }
-    }
 
-    
-    dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO); // redirect to normal stdout
-    if (!lastisbg) { // output is still in the pipe, fetch it out
-        int ret = write(STDOUT_FILENO, buf, strlen(buf));
-        if (ret == -1) return -1;
+        dup2(ORIGIN_STDIN_FILENO, STDIN_FILENO);
+        dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO);
     }
-    
-    return 1;
+    return 0;
 }
 
 void outputCmdList(CmdList *head) {
