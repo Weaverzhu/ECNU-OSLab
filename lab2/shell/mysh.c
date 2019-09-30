@@ -17,17 +17,36 @@ int main(int argc, char const *argv[])
 
     dbg("started");
 
+    int SOURCE_FD = STDOUT_FILENO;
+
+    if (argc > 1) {
+        dbg("batch mode on");
+        BATCH_MODE = 1;
+        SOURCE_FD = open(argv[1], O_RDONLY);
+        if (SOURCE_FD < 0) {
+            REPORT_ERR;
+            exit(-1);
+        }
+    }
+
     dup2(STDIN_FILENO, ORIGIN_STDIN_FILENO);
     dup2(STDOUT_FILENO, ORIGIN_STDOUT_FILENO); // make backup for stdin, stdout
+
+    #ifdef DEBUG
+    printf("%d %d\n", BATCH_MODE, SOURCE_FD);
+
+    #endif
+
 
     while (1) {
         static char cmdline[SIZE];
         PRINT_HEADER; // write header
         memset(cmdline, 0, sizeof cmdline); // clear the str
-        int ret = read(STDIN_FILENO, cmdline, SIZE); // read 512 bytes
+        int ret = read(SOURCE_FD, cmdline, SIZE); // read 512 bytes
+        if (ret == 0) break;
         if (ret == -1) { // go wrong
             REPORT_ERR;
-            continue;
+            break;
         } else if (ret == 1) { // empty file, only a \n left
             dbg("empty command");
             continue;
@@ -37,6 +56,8 @@ int main(int argc, char const *argv[])
         #ifdef DEBUG
         outputCmdList(head);
         #endif
+
+        // return 0;
 
         if (head == NULL) { // go wrong
             REPORT_ERR;
@@ -48,8 +69,6 @@ int main(int argc, char const *argv[])
         if (ret == -1)  {
             REPORT_ERR;
         }
-        // exit(0);
-        // free(c); // clean the things up
     }
     return 0; 
 }
