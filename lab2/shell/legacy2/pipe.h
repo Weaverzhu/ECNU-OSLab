@@ -9,8 +9,5 @@ typedef struct Pipe {
 } Pipe;
 
 Pipe *newPipe();
-int closeWrite(Pipe *p);
-int closeRead(Pipe *p);
-void closeBoth(Pipe *p);
 
 #endif

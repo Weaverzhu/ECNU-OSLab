@@ -16,18 +16,6 @@ Pipe *newPipe() { // return a new pipe pointer
     return res;
 }
 
-int closeWrite(Pipe *p) {
-    return close(p->pipefd[1]);
-}
-
-int closeRead(Pipe *p) {
-    return close(p->pipefd[0]);
-}
-
-void closeBoth(Pipe *p) {
-    close(p->pipefd[0]);
-    close(p->pipefd[1]);
-}
 
 // int passOnPipe(Pipe *left, Pipe *right) { // pass data from a pipe to another, 0 for suc, -1 for error
 //     static char buf[PIPE_SIZE];

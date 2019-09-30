@@ -9,12 +9,6 @@ CmdList *bghead;
 
 int main(int argc, char const *argv[])
 {
-    // #ifdef TEST
-    // test();
-    // #endif
-    // test();
-
-
     dbg("started");
 
     dup2(STDIN_FILENO, ORIGIN_STDIN_FILENO);

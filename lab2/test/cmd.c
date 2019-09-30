@@ -86,6 +86,7 @@ int tryBuiltIn(Cmd *c, char *output) {
         if (c->argv[1] != NULL) return -1;
         exit(0);
     } else if (match(cmdname, "pwd")) {
+        if (c->argv[1] != NULL) return -1;
         dbg("matched pwd");
         static char buf[SIZE];
         memset(buf, 0, sizeof buf);
@@ -111,6 +112,7 @@ int tryBuiltIn(Cmd *c, char *output) {
         if (ret == -1) return -1;
         else return 1;
     } else if (match(cmdname, "wait")) {
+        if (c->argv[1] != NULL) return -1;
         for (CmdList *t=bghead; t!=NULL; t=t->next) {
             pid_t cpid = c->bgpid;
             int ret = waitpid(cpid, NULL, 0);
@@ -182,7 +184,6 @@ int tryRedirect(Cmd *c) {
 
         if (fd < 0) return -1; // file open error
         dup2(fd, STDOUT_FILENO);
-        dbg("FUCK");
         free(c->argv[pos]); c->argv[pos] = NULL;
         return 1;
     }

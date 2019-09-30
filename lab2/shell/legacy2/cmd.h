@@ -13,7 +13,6 @@ typedef struct Cmd {
 typedef struct CmdList {
     struct CmdList *next;
     Cmd *data;
-    Pipe *pleft, *pright;
 } CmdList;
 
 

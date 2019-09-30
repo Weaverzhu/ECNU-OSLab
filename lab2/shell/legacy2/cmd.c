@@ -11,7 +11,6 @@
 
 CmdList *insertCmd(CmdList *head, Cmd *c){
     CmdList *res = allocate(CmdList, 1); res->data = c; res->next = NULL;
-    res->pleft = res->pright = NULL;
     if (head == NULL) {
         return res;
     } else {
@@ -83,26 +82,18 @@ int tryBuiltIn(Cmd *c, char *output) {
 
 
     if (match(cmdname, "exit")) {
-        if (c->argv[1] != NULL) return -1;
         exit(0);
     } else if (match(cmdname, "pwd")) {
-        if (c->argv[1] != NULL) return -1;
-        dbg("matched pwd");
-        static char buf[SIZE];
-        memset(buf, 0, sizeof buf);
-        getcwd(buf, SIZE);
+        static char *buf;
+        buf = getcwd(buf, SIZE);
         buf[strlen(buf)] = '\n';
         if (buf == NULL) return -1;
         if (output == NULL) {
+            write(STDOUT_FILENO, buf, strlen(buf));
             dbg("in tryBuiltIn: output to stdout");
-            printf("%d %s\n", strlen(buf), buf);
-        } else {
-            dbg("copy to output in pwd");
+        } else
             strcpy(output, buf);
-        }
-            
-        // free(buf);
-        dbg("end in pwd");
+        free(buf);
         return 1;
     } else if (match(cmdname, "cd")) {
         static char *buf;
@@ -112,7 +103,6 @@ int tryBuiltIn(Cmd *c, char *output) {
         if (ret == -1) return -1;
         else return 1;
     } else if (match(cmdname, "wait")) {
-        if (c->argv[1] != NULL) return -1;
         for (CmdList *t=bghead; t!=NULL; t=t->next) {
             pid_t cpid = c->bgpid;
             int ret = waitpid(cpid, NULL, 0);
@@ -124,7 +114,7 @@ int tryBuiltIn(Cmd *c, char *output) {
     return 0;
 }
 
-int runCommand(Cmd *c) { // deprecated
+int runCommand(Cmd *c) {
     int ret = tryBuiltIn(c, NULL);
     dbg("tried builtin");
     if (ret == 1) return 0;
@@ -144,6 +134,7 @@ int runCommand(Cmd *c) { // deprecated
             int ret = execvp(c->argv[0], c->argv);
             if (ret == -1) {
                 dbg("error in execvp");
+               
                 REPORT_ERR;
                 exit(-1);
             }
@@ -184,107 +175,141 @@ int tryRedirect(Cmd *c) {
 
         if (fd < 0) return -1; // file open error
         dup2(fd, STDOUT_FILENO);
+        dbg("FUCK");
         free(c->argv[pos]); c->argv[pos] = NULL;
         return 1;
     }
     return 0;
 }
 
+// int runtest(CmdList *head) {
+//     Cmd *c = head->data;
+//     int ret = 0;
+//     int pipefd[2]; pipe(pipefd);
+//     pid_t cpid = fork();
+//     if (cpid == 0) {
+//         close(pipefd[0]);
+//         dup2(pipefd[1], STDOUT_FILENO);
+//         ret = execvp(c->argv[0], c->argv); // exec the cmd
+//         // printf("FUCK");
+//         // write(pipefd[1], "fuck", strlen("fuck"));
+//         // close(pipefd[1]);
+//         // close(STDOUT_FILENO);
+//         // exit(0);
+//     } else {
+//         close(pipefd[1]);
+//         waitpid(cpid, NULL, 0);
+//         // wait(NULL);
+//         static char buf[PIPE_SIZE];
+//         memset(buf, 0, sizeof buf);
+//         read(pipefd[0], buf, PIPE_SIZE);
+//         int x = write(STDOUT_FILENO, buf, strlen(buf));
+//         write(STDOUT_FILENO, "\t", 1);
+//         // setred;
+//         // fprintf(stderr, "x=%d\n", x);
+//         // setwhite;
+//         close(pipefd[0]);
+//         return 0;
+//     }
+    
+// }
+
+
 int runCmdWithPipe(CmdList *head) {
-    Pipe *p;
-    pid_t lastpid;
-    int id = 0;
-
-    int pids[500], pcnt = 0;
-    char *buf = NULL;
-
-    for (CmdList *t=head; t!=NULL; t=t->next) {
+    Pipe *last = NULL, *next = NULL;
+    static int lastisbg = 0;
+    static char buf[PIPE_SIZE]; // buf should be loaded with the last cmd's data
+    pid_t cpid;
+    for (CmdList *t=head; t!=NULL; t=t->next) { // handle every cmd
         
-        p = NULL;
-        if (t->next != NULL) {
-            p = newPipe();
-            t->pright = t->next->pleft = p;
-        } else {
-            t->pright = NULL;
-        }
-
-        #ifdef DEBUG
-        setred;
-        fprintf(stderr, "id=%d pleft=%p pright=%p\n", id, t->pleft, t->pright);
-        #endif
+        last = next;
+        next = newPipe();
 
         Cmd *c = t->data;
-      
-        if (isBuiltIn(c)) {
-            dbg("yes");
-            if (t->pleft != NULL) {
-                dup2(t->pleft->pipefd[0], STDIN_FILENO);
-            }
-            int ret = tryRedirect(c);
+
+        if (isBuiltIn(c)) { // handle the cmd in this process when dealing builtin cmds
+            dbg("heads up, this is a built-in cmd");
+            if (t->next != NULL) dup2(next->pipefd[0], STDOUT_FILENO); // need to pass output
+            if (last != NULL) dup2(last->pipefd[0], STDIN_FILENO); // need to read data from stdin
+
+            int ret = tryRedirect(c); // try to redirect
             if (ret == -1) return -1;
-            buf = allocate(char, SIZE);
-            ret = tryBuiltIn(c, buf);
-            if (ret == -1) return -1;
-        } else {
-            dbg("no");
-            pid_t cpid = fork();
-            if (cpid == -1) return -1;
-            if (cpid == 0) {
-                if (t->pleft != NULL) {
-                    if (buf != NULL) {
-                        dbg("close here");
-                        closeWrite(t->pleft);
-                    }
-                    dup2(t->pleft->pipefd[0], STDIN_FILENO);
-                }
-                if (t->pright != NULL) {
-                    closeRead(t->pright);
-                    dup2(t->pright->pipefd[1], STDOUT_FILENO);
+            else if (ret == 1) dbg("redirect successfully");
+            if (t->next == NULL)
+                ret = tryBuiltIn(c, NULL);
+            else
+                ret = tryBuiltIn(c, buf); // write the data to buf
+
+            #ifdef DEBUG
+            setred;
+            fprintf(stderr, "write back: %s\n", buf);
+            setwhite;
+            #endif
+
+            if (ret != 1) return -1;
+            dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO); // reset stdout
+
+            lastisbg = 1;
+        } else { // configure pipes, this process will read from child process
+            if (t != head) last = newPipe(); // see if this is the first cmd
+            else last = NULL;
+            cpid = fork();
+            
+            if (cpid == 0) { // in child process
+
+                close(next->pipefd[0]);
+                dup2(next->pipefd[1], STDOUT_FILENO); // redirect stdin and stdout to pipe
+                dbg("redirect to next->pipefd[1]");
+                if (t != head) {
+                    dbg("FUCK");
+                    close(last->pipefd[1]);
+                    dup2(last->pipefd[0], STDIN_FILENO);
                 }
 
-
-                int ret = tryRedirect(c);
-                if (ret == -1) return -1;
+                int ret = tryRedirect(c); // try to redirect
+                outputcmd(c);
                 
-                ret = execvp(c->argv[0], c->argv);
-                if (t->pright != NULL) closeWrite(t->pright);
                 if (ret == -1) return -1;
+                ret = execvp(c->argv[0], c->argv); // exec the cmd
+                close(next->pipefd[1]);
                 exit(-1);
-            } else {
-                if (buf != NULL) {
-                    dbg("output from last builtin");
-                    #ifdef DEBUG
-                    fprintf(stderr, "buf=%s\n", buf);
-                    #endif
-                    closeRead(t->pleft);
-                    write(t->pleft->pipefd[1], buf, strlen(buf));
-                    free(buf); buf = NULL;
-                    closeWrite(t->pleft);
+            } else { // in shell process
+                if (t != head) { // pass data from last process
+                    close(last->pipefd[0]);
+                    write(last->pipefd[1], buf, strlen(buf));
+                    close(last->pipefd[1]);
                 }
+                close(next->pipefd[1]);
+                // waitpid(cpid, NULL, 0);
+                // close(next->pipefd[0]);
+                memset(buf, 0, sizeof buf);
+                int num = read(next->pipefd[0], buf, PIPE_SIZE); // prepare the data for the next cmd
+                close(next->pipefd[0]);
+            }
 
-                if (t->pright != NULL)
-                    closeWrite(t->pright);
-                pids[pcnt++] = cpid;
+            lastisbg = 0;
+        }
+
+        if (t->next != NULL) { // still cmd left to exec
+            waitpid(cpid, NULL, 0); // wait the current cmd stop to get the output
+        } else {
+            if (isBackground) { // no need to wait for the last cmd to finish
+                c->bgpid = cpid;
+                insertCmd(bghead, c); // add it to the list
+            } else {
+                waitpid(cpid, NULL, 0); // wait as usual
             }
         }
-        dup2(ORIGIN_STDIN_FILENO, STDIN_FILENO);
-        dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO);
-        ++id;
     }
-    if (!isBackground) {
-        dbg("wait");
-        for (int i=0; i<pcnt; ++i) {
-            waitpid(pids[i], NULL, 0);
-        }
+
+    
+    dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO); // redirect to normal stdout
+    if (!lastisbg) { // output is still in the pipe, fetch it out
+        int ret = write(STDOUT_FILENO, buf, strlen(buf));
+        if (ret == -1) return -1;
     }
-    if (buf != NULL) {
-        
-        write(STDOUT_FILENO, buf, strlen(buf));
-        buf[strlen(buf)] = '\n';
-        free(buf); buf = NULL;
-        
-    }
-    return 0;
+    
+    return 1;
 }
 
 void outputCmdList(CmdList *head) {
