@@ -83,6 +83,7 @@ int tryBuiltIn(Cmd *c, char *output) {
 
 
     if (match(cmdname, "exit")) {
+        if (c->argv[1] != NULL) return -1;
         exit(0);
     } else if (match(cmdname, "pwd")) {
         dbg("matched pwd");
