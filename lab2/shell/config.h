@@ -14,8 +14,12 @@ extern const char HEADER[];
 #define PRINT_HEADER write(STDOUT_FILENO, HEADER, strlen(HEADER));
 #define WRITE_FILE_MODE O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU
 // #define DEBUG
+#define REDIRECT_FLG 2
 #define _GNU_SOURCE
 
 #define TEST
+
+extern const int DBG_MODE;
+
 
 #endif

@@ -1,48 +1,75 @@
 #include <sys/types.h>
-       #include <sys/wait.h>
-       #include <stdio.h>
-       #include <stdlib.h>
-       #include <unistd.h>
-       #include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-       int
-       main(int argc, char *argv[])
-       {
-           int pipefd[2];
-           pid_t cpid;
-           char buf;
+int main(int argc, char *argv[])
+{
+    struct stat sb;
 
-           if (argc != 2) {
-               fprintf(stderr, "Usage: %s <string>\n", argv[0]);
-               exit(EXIT_FAILURE);
-           }
+    if (argc != 2)
+    {
+        fprintf(stderr, "Usage: %s <pathname>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
-           if (pipe(pipefd) == -1) {
-               perror("pipe");
-               exit(EXIT_FAILURE);
-           }
+    if (stat(argv[1], &sb) == -1)
+    {
+        perror("stat");
+        exit(EXIT_FAILURE);
+    }
 
-           cpid = fork();
-           if (cpid == -1) {
-               perror("fork");
-               exit(EXIT_FAILURE);
-           }
+    printf("File type:                ");
+    switch (sb.st_mode & S_IFMT)
+    {
+    case S_IFBLK:
+        printf("block device\n");
+        break;
+    case S_IFCHR:
+        printf("character device\n");
+        break;
+    case S_IFDIR:
+        printf("directory\n");
+        break;
+    case S_IFIFO:
+        printf("FIFO/pipe\n");
+        break;
+    case S_IFLNK:
+        printf("symlink\n");
+        break;
+    case S_IFREG:
+        printf("regular file\n");
+        break;
+    case S_IFSOCK:
+        printf("socket\n");
+        break;
+    default:
+        printf("unknown?\n");
+        break;
+    }
 
-           if (cpid == 0) {    /* Child reads from pipe */
-               close(pipefd[1]);          /* Close unused write end */
+    printf("I-node number:            %ld\n", (long)sb.st_ino);
 
-               while (read(pipefd[0], &buf, 1) > 0)
-                   write(STDOUT_FILENO, &buf, 1);
+    printf("Mode:                     %lo (octal)\n",
+           (unsigned long)sb.st_mode);
 
-               write(STDOUT_FILENO, "\n", 1);
-               close(pipefd[0]);
-               _exit(EXIT_SUCCESS);
+    printf("Link count:               %ld\n", (long)sb.st_nlink);
+    printf("Ownership:                UID=%ld   GID=%ld\n",
+           (long)sb.st_uid, (long)sb.st_gid);
 
-           } else {            /* Parent writes argv[1] to pipe */
-               close(pipefd[0]);          /* Close unused read end */
-               write(pipefd[1], argv[1], strlen(argv[1]));
-               close(pipefd[1]);          /* Reader will see EOF */
-               wait(NULL);                /* Wait for child */
-               exit(EXIT_SUCCESS);
-           }
-       }
+    printf("Preferred I/O block size: %ld bytes\n",
+           (long)sb.st_blksize);
+    printf("File size:                %lld bytes\n",
+           (long long)sb.st_size);
+    printf("Blocks allocated:         %lld\n",
+           (long long)sb.st_blocks);
+
+    printf("Last status change:       %s", ctime(&sb.st_ctime));
+    printf("Last file access:         %s", ctime(&sb.st_atime));
+    printf("Last file modification:   %s", ctime(&sb.st_mtime));
+
+    exit(EXIT_SUCCESS);
+}

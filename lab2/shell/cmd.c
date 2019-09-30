@@ -181,6 +181,8 @@ int tryRedirect(Cmd *c) {
     
         int fd = open(c->argv[argc-1], WRITE_FILE_MODE);
 
+        if (DBG_MODE & REDIRECT_FLG)
+            fprintf(stderr, "fd=%d\n", fd);
 
         if (fd < 0) return -1; // file open error
         dup2(fd, STDOUT_FILENO);
