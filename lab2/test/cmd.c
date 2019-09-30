@@ -85,16 +85,22 @@ int tryBuiltIn(Cmd *c, char *output) {
     if (match(cmdname, "exit")) {
         exit(0);
     } else if (match(cmdname, "pwd")) {
-        static char *buf;
-        buf = getcwd(buf, SIZE);
+        dbg("matched pwd");
+        static char buf[SIZE];
+        memset(buf, 0, sizeof buf);
+        getcwd(buf, SIZE);
         buf[strlen(buf)] = '\n';
         if (buf == NULL) return -1;
         if (output == NULL) {
-            write(STDOUT_FILENO, buf, strlen(buf));
             dbg("in tryBuiltIn: output to stdout");
-        } else
+            printf("%d %s\n", strlen(buf), buf);
+        } else {
+            dbg("copy to output in pwd");
             strcpy(output, buf);
-        free(buf);
+        }
+            
+        // free(buf);
+        dbg("end in pwd");
         return 1;
     } else if (match(cmdname, "cd")) {
         static char *buf;
@@ -115,7 +121,7 @@ int tryBuiltIn(Cmd *c, char *output) {
     return 0;
 }
 
-int runCommand(Cmd *c) {
+int runCommand(Cmd *c) { // deprecated
     int ret = tryBuiltIn(c, NULL);
     dbg("tried builtin");
     if (ret == 1) return 0;
@@ -135,7 +141,6 @@ int runCommand(Cmd *c) {
             int ret = execvp(c->argv[0], c->argv);
             if (ret == -1) {
                 dbg("error in execvp");
-               
                 REPORT_ERR;
                 exit(-1);
             }
@@ -189,6 +194,7 @@ int runCmdWithPipe(CmdList *head) {
     int id = 0;
 
     int pids[500], pcnt = 0;
+    char *buf = NULL;
 
     for (CmdList *t=head; t!=NULL; t=t->next) {
         
@@ -208,28 +214,33 @@ int runCmdWithPipe(CmdList *head) {
         Cmd *c = t->data;
       
         if (isBuiltIn(c)) {
+            dbg("yes");
             if (t->pleft != NULL) {
                 dup2(t->pleft->pipefd[0], STDIN_FILENO);
             }
-            if (t->pright != NULL) {
-                closeRead(t->pright);
-                dup2(t->pright->pipefd[1], STDOUT_FILENO);
-            }
             int ret = tryRedirect(c);
             if (ret == -1) return -1;
-            ret = tryBuiltIn(c, NULL);
+            buf = allocate(char, SIZE);
+            ret = tryBuiltIn(c, buf);
             if (ret == -1) return -1;
         } else {
+            dbg("no");
             pid_t cpid = fork();
             if (cpid == -1) return -1;
             if (cpid == 0) {
                 if (t->pleft != NULL) {
+                    if (buf != NULL) {
+                        dbg("close here");
+                        closeWrite(t->pleft);
+                    }
                     dup2(t->pleft->pipefd[0], STDIN_FILENO);
                 }
                 if (t->pright != NULL) {
                     closeRead(t->pright);
                     dup2(t->pright->pipefd[1], STDOUT_FILENO);
                 }
+
+
                 int ret = tryRedirect(c);
                 if (ret == -1) return -1;
                 
@@ -238,6 +249,17 @@ int runCmdWithPipe(CmdList *head) {
                 if (ret == -1) return -1;
                 exit(-1);
             } else {
+                if (buf != NULL) {
+                    dbg("output from last builtin");
+                    #ifdef DEBUG
+                    fprintf(stderr, "buf=%s\n", buf);
+                    #endif
+                    closeRead(t->pleft);
+                    write(t->pleft->pipefd[1], buf, strlen(buf));
+                    free(buf); buf = NULL;
+                    closeWrite(t->pleft);
+                }
+
                 if (t->pright != NULL)
                     closeWrite(t->pright);
                 pids[pcnt++] = cpid;
@@ -246,13 +268,19 @@ int runCmdWithPipe(CmdList *head) {
         dup2(ORIGIN_STDIN_FILENO, STDIN_FILENO);
         dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO);
         ++id;
-        
     }
     if (!isBackground) {
         dbg("wait");
         for (int i=0; i<pcnt; ++i) {
             waitpid(pids[i], NULL, 0);
         }
+    }
+    if (buf != NULL) {
+        
+        write(STDOUT_FILENO, buf, strlen(buf));
+        buf[strlen(buf)] = '\n';
+        free(buf); buf = NULL;
+        
     }
     return 0;
 }

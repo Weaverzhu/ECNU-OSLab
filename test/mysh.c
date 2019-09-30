@@ -7,6 +7,8 @@
 
 #define N 10000
 
+#define SIZE 512
+
 char buf[N];
 
 
@@ -17,26 +19,19 @@ main(int argc, char *argv[])
 
     int fd1[2];
     pipe(fd1);
-    if ((cpid = fork()) == 0) {
-        close(fd1[0]);
-        dup2(fd1[1], STDOUT_FILENO);
-        char *argv[10] = {
-            "ls"
-        };
-        execvp(argv[0], argv);
-        puts("FUCK");
-    } else {
-        close(fd1[1]);
-    }
+    char buf[SIZE] = "fuck";
 
     if ((cpid = fork()) == 0) {
+        close(fd1[1]);
         dup2(fd1[0], STDIN_FILENO);
         char *argv[10] = {
             "wc"
         };
         execvp(argv[0], argv);
-        puts("FUCK");
     } else {
+        close(fd1[0]);
+        write(fd1[1], buf, strlen(buf));
+        close(fd1[1]);
         waitpid(cpid, NULL, 0);
         return 0;
     }
