@@ -1,4 +1,4 @@
 make
 echo ========output=======
-time ./pipe fuck
+./mysh
 echo =====================

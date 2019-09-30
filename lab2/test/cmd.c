@@ -11,6 +11,7 @@
 
 CmdList *insertCmd(CmdList *head, Cmd *c){
     CmdList *res = allocate(CmdList, 1); res->data = c; res->next = NULL;
+    res->pleft = res->pright = NULL;
     if (head == NULL) {
         return res;
     } else {
@@ -183,19 +184,31 @@ int tryRedirect(Cmd *c) {
 }
 
 int runCmdWithPipe(CmdList *head) {
-    Pipe *p, *last;
+    Pipe *p;
+    pid_t lastpid;
+    int id = 0;
+
+    int pids[500], pcnt = 0;
 
     for (CmdList *t=head; t!=NULL; t=t->next) {
+        
         p = NULL;
         if (t->next != NULL) {
             p = newPipe();
             t->pright = t->next->pleft = p;
+        } else {
+            t->pright = NULL;
         }
 
+        #ifdef DEBUG
+        setred;
+        fprintf(stderr, "id=%d pleft=%p pright=%p\n", id, t->pleft, t->pright);
+        #endif
+
         Cmd *c = t->data;
+      
         if (isBuiltIn(c)) {
             if (t->pleft != NULL) {
-                closeWrite(t->pleft);
                 dup2(t->pleft->pipefd[0], STDIN_FILENO);
             }
             if (t->pright != NULL) {
@@ -211,7 +224,6 @@ int runCmdWithPipe(CmdList *head) {
             if (cpid == -1) return -1;
             if (cpid == 0) {
                 if (t->pleft != NULL) {
-                    closeWrite(t->pleft);
                     dup2(t->pleft->pipefd[0], STDIN_FILENO);
                 }
                 if (t->pright != NULL) {
@@ -220,15 +232,27 @@ int runCmdWithPipe(CmdList *head) {
                 }
                 int ret = tryRedirect(c);
                 if (ret == -1) return -1;
+                
                 ret = execvp(c->argv[0], c->argv);
+                if (t->pright != NULL) closeWrite(t->pright);
                 if (ret == -1) return -1;
+                exit(-1);
             } else {
-                closeBoth(p);
+                if (t->pright != NULL)
+                    closeWrite(t->pright);
+                pids[pcnt++] = cpid;
             }
         }
-
         dup2(ORIGIN_STDIN_FILENO, STDIN_FILENO);
         dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO);
+        ++id;
+        
+    }
+    if (!isBackground) {
+        dbg("wait");
+        for (int i=0; i<pcnt; ++i) {
+            waitpid(pids[i], NULL, 0);
+        }
     }
     return 0;
 }
