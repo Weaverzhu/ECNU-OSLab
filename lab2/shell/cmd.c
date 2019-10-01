@@ -178,7 +178,9 @@ int tryRedirect(Cmd *c) {
 
         if (pos != argc-2) 
             return -1; // > {file} is not at the end of file
-    
+        struct stat filestat;
+        int ret = stat(c->argv[argc-1], &filestat);
+        if (ret == -1) return -1;
         int fd = open(c->argv[argc-1], WRITE_FILE_MODE);
 
         if (DBG_MODE & REDIRECT_FLG)
