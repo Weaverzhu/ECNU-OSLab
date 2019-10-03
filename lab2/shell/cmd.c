@@ -87,22 +87,15 @@ int tryBuiltIn(Cmd *c, char *output) {
         exit(0);
     } else if (match(cmdname, "pwd")) {
         if (c->argv[1] != NULL) return -1;
-        dbg("matched pwd");
         static char buf[SIZE];
         memset(buf, 0, sizeof buf);
         getcwd(buf, SIZE);
         buf[strlen(buf)] = '\n';
         if (buf == NULL) return -1;
         if (output == NULL) {
-            dbg("in tryBuiltIn: output to stdout");
-            printf("%d %s\n", strlen(buf), buf);
         } else {
-            dbg("copy to output in pwd");
             strcpy(output, buf);
         }
-            
-        // free(buf);
-        dbg("end in pwd");
         return 1;
     } else if (match(cmdname, "cd")) {
         static char *buf;
@@ -193,7 +186,6 @@ int tryRedirect(Cmd *c) {
 
 int runCmdWithPipe(CmdList *head) {
     Pipe *p;
-    pid_t lastpid;
     int id = 0;
 
     int pids[500], pcnt = 0;
@@ -209,15 +201,9 @@ int runCmdWithPipe(CmdList *head) {
             t->pright = NULL;
         }
 
-        #ifdef DEBUG
-        setred;
-        fprintf(stderr, "id=%d pleft=%p pright=%p\n", id, t->pleft, t->pright);
-        #endif
-
         Cmd *c = t->data;
       
         if (isBuiltIn(c)) {
-            dbg("yes");
             if (t->pleft != NULL) {
                 dup2(t->pleft->pipefd[0], STDIN_FILENO);
             }
@@ -227,13 +213,11 @@ int runCmdWithPipe(CmdList *head) {
             ret = tryBuiltIn(c, buf);
             if (ret == -1) return -1;
         } else {
-            dbg("no");
             pid_t cpid = fork();
             if (cpid == -1) return -1;
             if (cpid == 0) {
                 if (t->pleft != NULL) {
                     if (buf != NULL) {
-                        dbg("close here");
                         closeWrite(t->pleft);
                     }
                     dup2(t->pleft->pipefd[0], STDIN_FILENO);
@@ -253,10 +237,6 @@ int runCmdWithPipe(CmdList *head) {
                 exit(-1);
             } else {
                 if (buf != NULL) {
-                    dbg("output from last builtin");
-                    #ifdef DEBUG
-                    fprintf(stderr, "buf=%s\n", buf);
-                    #endif
                     closeRead(t->pleft);
                     write(t->pleft->pipefd[1], buf, strlen(buf));
                     free(buf); buf = NULL;
@@ -273,7 +253,6 @@ int runCmdWithPipe(CmdList *head) {
         ++id;
     }
     if (!isBackground) {
-        dbg("wait");
         for (int i=0; i<pcnt; ++i) {
             waitpid(pids[i], NULL, 0);
         }
