@@ -30,7 +30,6 @@ wc(int fd, char *name)
     exit();
   }
   printf(1, "%d %d %d %s\n", l, w, c, name);
-  printf(1, "hack: readcount=%d\n", getreadcount());
 }
 
 int

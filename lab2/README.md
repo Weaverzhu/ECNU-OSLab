@@ -397,3 +397,214 @@ return 0;
 ```
 
 ### conclusion
+
+# Project 1b: xv6 System Call
+
+我们的目的是实现一个新的系统调用，那么一个合理的方法是看看其他的系统调用是在哪里实现的
+
+在 ./kernal/ 可以寻找到 syscall.c，按照道理来说，这肯定是关于系统调用的代码。
+
+
+```c
+// array of function pointers to handlers for all the syscalls
+static int (*syscalls[])(void) = {
+[SYS_chdir]   sys_chdir,
+[SYS_close]   sys_close,
+[SYS_dup]     sys_dup,
+[SYS_exec]    sys_exec,
+[SYS_exit]    sys_exit,
+[SYS_fork]    sys_fork,
+[SYS_fstat]   sys_fstat,
+[SYS_getpid]  sys_getpid,
+[SYS_kill]    sys_kill,
+[SYS_link]    sys_link,
+[SYS_mkdir]   sys_mkdir,
+[SYS_mknod]   sys_mknod,
+[SYS_open]    sys_open,
+[SYS_pipe]    sys_pipe,
+[SYS_read]    sys_read,
+[SYS_sbrk]    sys_sbrk,
+[SYS_sleep]   sys_sleep,
+[SYS_unlink]  sys_unlink,
+[SYS_wait]    sys_wait,
+[SYS_write]   sys_write,
+[SYS_uptime]  sys_uptime,
+[SYS_getreadcount] sys_getreadcount // new added
+};
+// Called on a syscall trap. Checks that the syscall number (passed via eax)
+// is valid and then calls the appropriate handler for the syscall.
+void
+syscall(void)
+{
+  int num;
+  num = proc->tf->eax;
+  if(num > 0 && num < NELEM(syscalls) && syscalls[num] != NULL) {
+    proc->tf->eax = syscalls[num]();
+  } else {
+    cprintf("%d %s: unknown sys call %d\n",
+            proc->pid, proc->name, num);
+    proc->tf->eax = -1;
+  }
+}
+
+```
+
+看起来这里执行的逻辑是，`trap` 执行后，从 `eax` 寄存器中找到函数 `id`，然后再从上面的数组中找到函数指针。
+
+其中 `NELEM(syscalls)` 是宏定义，不需要特别改动，所以我们只需要为数组加上我们想要的函数指针就行了。
+
+那么这个函数指针从哪里来的？我们需要找到地方实现，并且在相应的头文件中给出定义（这样其他文件才能获取函数定义）。我们可以在文件中找到相应注释：
+
+```c
+// syscall function declarations moved to sysfunc.h so compiler
+// can catch definitions that don't match
+```
+
+然后我们再去 `sysfunc.h` 添加我们的函数定义
+
+
+```c
+#ifndef _SYSFUNC_H_
+#define _SYSFUNC_H_
+
+// System call handlers
+int sys_chdir(void);
+int sys_close(void);
+int sys_dup(void);
+int sys_exec(void);
+int sys_exit(void);
+int sys_fork(void);
+int sys_fstat(void);
+int sys_getpid(void);
+int sys_kill(void);
+int sys_link(void);
+int sys_mkdir(void);
+int sys_mknod(void);
+int sys_open(void);
+int sys_pipe(void);
+int sys_read(void);
+int sys_sbrk(void);
+int sys_sleep(void);
+int sys_unlink(void);
+int sys_wait(void);
+int sys_write(void);
+int sys_uptime(void);
+int sys_getreadcount(void); // new added
+
+#endif // _SYSFUNC_H_
+
+```
+
+这里的函数名对应着刚刚我们在函数指针数组中添加的函数指针名
+
+之后我们去寻找函数实现的地方，肯定和 `sys_read` 有关。从 `sysfile.c` 中我们找到了 `sys_read` 的定义。之后做的事情就相当简单了，我们定义一个全局变量去记录被调用的次数就可以了。
+
+
+```c
+int readcount = 0;
+
+int
+sys_read(void)
+{
+  ++readcount;
+  struct file *f;
+  int n;
+  char *p;
+
+  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
+    return -1;
+  return fileread(f, p, n);
+}
+
+int
+sys_getreadcount(void) {
+  return readcount;
+}
+
+```
+
+那么还有一个问题，处于用户态时用户怎么调用它呢？我们转到 `user` 文件夹，发现了 `user.h` 中的函数定义，添加上即可。
+
+```c
+// system calls
+int fork(void);
+int exit(void) __attribute__((noreturn));
+int wait(void);
+int pipe(int*);
+int write(int, void*, int);
+int read(int, void*, int);
+int close(int);
+int kill(int);
+int exec(char*, char**);
+int open(char*, int);
+int mknod(char*, short, short);
+int unlink(char*);
+int fstat(int fd, struct stat*);
+int link(char*, char*);
+int mkdir(char*);
+int chdir(char*);
+int dup(int);
+int getpid(void);
+char* sbrk(int);
+int sleep(int);
+int uptime(void);
+int getreadcount(void); // added
+```
+
+## test
+
+最后，我们为 `xv6` 添加一个新的程序 `readcounttest`
+
+```c
+#include "types.h"
+#include "stat.h"
+#include "user.h"
+
+
+int
+main(int argc, char *argv[])
+{
+  if (argc > 1) {
+      printf(1, "usage: mytest");
+  }
+  printf(1, "total %d reads\n", getreadcount());
+  exit();
+}
+
+```
+
+FILE: ./user/readcounttest
+
+测试结果：
+
+```sh
+cpu1: starting
+cpu0: starting
+init: starting sh
+$ readcounttest
+total 14 reads
+```
+
+我们查看 `gets()` 实现：
+
+```c
+char*
+gets(char *buf, int max)
+{
+  int i, cc;
+  char c;
+
+  for(i=0; i+1 < max; ){
+    cc = read(0, &c, 1);
+    if(cc < 1)
+      break;
+    buf[i++] = c;
+    if(c == '\n' || c == '\r')
+      break;
+  }
+  buf[i] = '\0';
+  return buf;
+}
+```
+
+读入多少字符就会由多少 `read` 产生，`readcounttest`加上回车共 `14` 字符，所以结果显示 `total 14 reads` 符合预测
