@@ -4,6 +4,7 @@ mysh
 pipe
 cleanxv6
 *.tar.gz
+./vscode
 
 # Prerequisites
 *.d
