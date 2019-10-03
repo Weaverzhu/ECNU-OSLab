@@ -6,7 +6,7 @@ int ORIGIN_STDOUT_FILENO, ORIGIN_STDIN_FILENO;
 char **parse(char *str, const char *delim, int allowEmpty) {
     dbg("parse started");
     char *localstr = strdup(str), *token, *saveptr;
-    static char buf[SIZE][SIZE];
+    static char buf[SIZE >> 1][SIZE];
     int count = 0;
     for (char *s=localstr; ; s=NULL) {
         token = strtok_r(s, delim, &saveptr);

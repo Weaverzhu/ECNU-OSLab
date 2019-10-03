@@ -40,11 +40,15 @@ int main(int argc, char const *argv[])
 
 
     while (1) {
-        static char cmdline[SIZE];
+        char cmdline[SIZE];
         PRINT_HEADER; // write header
         memset(cmdline, 0, sizeof cmdline); // clear the str
         // int ret = read(SOURCE_FD, cmdline, SIZE); // read 512 bytes
         char *rets = fgets(cmdline, SIZE, f);
+        if (strlen(cmdline) > 512) {
+            REPORT_ERR;
+            continue;
+        }
         if (rets == NULL) break;
         else if (strlen(cmdline) == 1) { // empty file, only a \n left
             dbg("empty command");

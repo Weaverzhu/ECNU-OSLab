@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#define SIZE 512
+#define SIZE 520
 #define PIPE_SIZE 5120
 
 extern const char error_message[];

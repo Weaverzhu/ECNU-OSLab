@@ -87,7 +87,7 @@ int tryBuiltIn(Cmd *c, char *output) {
         exit(0);
     } else if (match(cmdname, "pwd")) {
         if (c->argv[1] != NULL) return -1;
-        static char buf[SIZE];
+        char buf[SIZE];
         memset(buf, 0, sizeof buf);
         getcwd(buf, SIZE);
         buf[strlen(buf)] = '\n';
@@ -98,7 +98,7 @@ int tryBuiltIn(Cmd *c, char *output) {
         }
         return 1;
     } else if (match(cmdname, "cd")) {
-        static char *buf;
+        char *buf;
         if (c->argv[1] == NULL) buf = getenv("HOME");
         else buf = c->argv[1];
         int ret = chdir(buf);
@@ -268,7 +268,7 @@ int runCmdWithPipe(CmdList *head) {
 }
 
 void outputCmdList(CmdList *head) {
-    const static int ind = 1;
+    const int ind = 1;
     for (CmdList *t=head; t!=NULL; t=t->next) {
         // indent(ind);
         setindent(ind);
