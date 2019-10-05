@@ -38,6 +38,15 @@ Cmd *newCommand(char *cmdstr) {
 
 
 int isBackground;
+
+
+void replacechr(char *s, int l, int r, char a, char b) {
+    for (int i=l; i<=r; ++i) {
+        if (s[i] == a) s[i] = b;
+    }
+}
+
+
 CmdList *parseLine(char *cmdline) {
     isBackground = 0;
     trim(cmdline);
@@ -60,11 +69,30 @@ CmdList *parseLine(char *cmdline) {
         isBackground = 1;
     }
 
+    for (int i=0, j; cmdline[i]!=0; ++i) {
+        if (cmdline[i] == '\"') {
+            j = i+1;
+            while (cmdline[j]!=0 && cmdline[j]!='\"') ++j;
+            if (cmdline[j]!='\"') return NULL;
+
+            replacechr(cmdline, i, j, ' ', 6);
+            replacechr(cmdline, i, j, '|', 7);
+            replacechr(cmdline, i, j, '\"', ' ');
+            i = j;
+        }
+    }
+
+
     char **cmdstr = parse(cmdline, "|\n", 0);
     if (cmdstr == NULL) return NULL;
     
     CmdList *head = NULL;
     for (int i=0; cmdstr[i]!=NULL; ++i){
+        int len = strlen(cmdstr[i]);
+        replacechr(cmdstr[i], 0, len-1, 6, ' ');
+        replacechr(cmdstr[i], 0, len-1, 7, '|');
+
+
         Cmd *newcmd = newCommand(cmdstr[i]);
         head = insertCmd(head, newcmd);
     }
