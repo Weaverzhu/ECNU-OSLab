@@ -201,7 +201,8 @@ int runCmdWithPipe(CmdList *head) {
       
         if (isBuiltIn(c)) {
             if (t->pleft != NULL) {
-                dup2(t->pleft->pipefd[0], STDIN_FILENO);
+                // dup2(t->pleft->pipefd[0], STDIN_FILENO);
+                closeRead(t->pleft);
             }
             int ret = tryRedirect(c);
             if (ret == -1) return -1;
