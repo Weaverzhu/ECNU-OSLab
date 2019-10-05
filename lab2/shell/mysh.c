@@ -33,10 +33,6 @@ int main(int argc, char const *argv[])
     dup2(STDIN_FILENO, ORIGIN_STDIN_FILENO);
     dup2(STDOUT_FILENO, ORIGIN_STDOUT_FILENO); // make backup for stdin, stdout
     
-    #ifdef DEBUG
-    printf("%d %d\n", BATCH_MODE, SOURCE_FD);
-
-    #endif
 
 
     while (1) {
@@ -66,12 +62,14 @@ int main(int argc, char const *argv[])
 
         if (head == NULL) { // go wrong
             REPORT_ERR;
+            dbg("head is null");
             continue;
-        }
+        } else dbg("head is not null");
         
         ret = runCmdWithPipe(head); // show time
         // ret = runtest(head);
         if (ret == -1)  {
+            dbg("run time error");
             REPORT_ERR;
         }
     }

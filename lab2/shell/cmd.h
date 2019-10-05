@@ -25,7 +25,6 @@ Cmd *newCommand(char *cmdstr);
 int runBackgourndCmd(Cmd *c);
 int runCmdWithPipe(CmdList *head);
 int tryBuiltIn(Cmd *c, char *buf);
-int runCommand(Cmd *c);
 int isBuiltIn(Cmd *c);
 int tryRedirect(Cmd *c);
 

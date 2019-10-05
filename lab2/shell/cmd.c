@@ -83,8 +83,10 @@ int tryBuiltIn(Cmd *c, char *output) {
 
 
     if (match(cmdname, "exit")) {
+        dbg("exit here");
         if (c->argv[1] != NULL) return -1;
         exit(0);
+        dbg("exit failed");
     } else if (match(cmdname, "pwd")) {
         if (c->argv[1] != NULL) return -1;
         char buf[SIZE];
@@ -117,40 +119,6 @@ int tryBuiltIn(Cmd *c, char *output) {
     return 0;
 }
 
-int runCommand(Cmd *c) { // deprecated
-    int ret = tryBuiltIn(c, NULL);
-    dbg("tried builtin");
-    if (ret == 1) return 0;
-    else if (ret == 0) {
-        #ifdef DEBUG
-            setgreen;
-            for (int i=0; c->argv[i]!=NULL; ++i)
-                fprintf(stderr, "[%d] |%s|\n", i, c->argv[i]);
-            setwhite;
-        #endif
-
-
-        pid_t cpid = fork();
-        if (cpid == -1) return -1;
-        
-        if (cpid == 0) {
-            int ret = execvp(c->argv[0], c->argv);
-            if (ret == -1) {
-                dbg("error in execvp");
-                REPORT_ERR;
-                exit(-1);
-            }
-        } else {
-            if (isBackground) {
-                c->bgpid = cpid;
-                insertCmd(bghead, c);
-            } else {
-                waitpid(cpid, NULL, 0);
-            }
-        }
-    } else return -1;
-    return 0;
-}
 
 int isBuiltIn(Cmd *c) {
     char *cmdname = c->argv[0];
@@ -192,7 +160,7 @@ int runCmdWithPipe(CmdList *head) {
     char *buf = NULL;
 
     for (CmdList *t=head; t!=NULL; t=t->next) {
-        
+        dbg("in main loop");
         p = NULL;
         if (t->next != NULL) {
             p = newPipe();
@@ -232,8 +200,9 @@ int runCmdWithPipe(CmdList *head) {
                 if (ret == -1) return -1;
                 
                 ret = execvp(c->argv[0], c->argv);
+                REPORT_ERR;
                 if (t->pright != NULL) closeWrite(t->pright);
-                if (ret == -1) return -1;
+                if (t->pleft != NULL) closeRead(t->pleft);
                 exit(-1);
             } else {
                 if (buf != NULL) {
@@ -251,6 +220,7 @@ int runCmdWithPipe(CmdList *head) {
         dup2(ORIGIN_STDIN_FILENO, STDIN_FILENO);
         dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO);
         ++id;
+        dbg("id increased");
     }
     if (!isBackground) {
         for (int i=0; i<pcnt; ++i) {
@@ -264,6 +234,7 @@ int runCmdWithPipe(CmdList *head) {
         free(buf); buf = NULL;
         
     }
+    dbg("return 0 correctly");
     return 0;
 }
 
