@@ -22,6 +22,13 @@ CmdList *insertCmd(CmdList *head, Cmd *c){
     return head;
 }
 
+
+void replacechr(char *s, int l, int r, char a, char b) {
+    for (int i=l; i<=r; ++i) {
+        if (s[i] == a) s[i] = b;
+    }
+}
+
 Cmd *newCommand(char *cmdstr) {
     #ifdef DEBUG
     setgreen;
@@ -31,6 +38,10 @@ Cmd *newCommand(char *cmdstr) {
 
     Cmd *res = allocate(Cmd, 1);
     res->argv = parse(cmdstr, " \n", 1);
+    for (int i=0; res->argv[i]!=NULL; ++i) {
+        replacechr(res->argv[i], 0, strlen(res->argv[i])-1, '*', ' ');
+        replacechr(res->argv[i], 0, strlen(res->argv[i])-1, 7, '|');
+    }
     res->read = res->write = NULL;
     res->bgpid = 0;
     return res;
@@ -40,11 +51,6 @@ Cmd *newCommand(char *cmdstr) {
 int isBackground;
 
 
-void replacechr(char *s, int l, int r, char a, char b) {
-    for (int i=l; i<=r; ++i) {
-        if (s[i] == a) s[i] = b;
-    }
-}
 
 
 CmdList *parseLine(char *cmdline) {
@@ -88,9 +94,7 @@ CmdList *parseLine(char *cmdline) {
     
     CmdList *head = NULL;
     for (int i=0; cmdstr[i]!=NULL; ++i){
-        int len = strlen(cmdstr[i]);
-        replacechr(cmdstr[i], 0, len-1, '*', ' ');
-        replacechr(cmdstr[i], 0, len-1, 7, '|');
+        
 
 
         Cmd *newcmd = newCommand(cmdstr[i]);
