@@ -21,8 +21,4 @@ extern int BATCH_MODE;
 #define REDIRECT_FLG 2
 #define _GNU_SOURCE
 
-#define TEST
-
-
-
 #endif

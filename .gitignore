@@ -6,6 +6,8 @@ cleanxv6
 *.tar.gz
 ./vscode
 test
+judger
+
 
 # Prerequisites
 *.d

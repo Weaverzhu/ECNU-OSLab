@@ -2,6 +2,31 @@
 
 完成一个 `shell` 需要考虑各个模块的实现方式，以下是 `mysh` 大致实现思路
 
+## File structure
+
+```
+|-- lab2
+    |-- cmd.c // 执行命令
+    |-- cmd.h
+    |-- config.c // 全局设置
+    |-- config.h
+    |-- makefile // makefile
+    |-- mysh
+    |-- mysh.c // 主程序
+    |-- mysh.h
+    |-- pipe.c // 管道
+    |-- pipe.h
+    |-- run.sh // 执行脚本
+    |-- util.c // 一些辅助函数
+    |-- util.h
+
+```
+
+## Environment
+
++ gcc version 5.5.0 20171010 (Ubuntu 5.5.0-12ubuntu1~16.04)
++ aliyun 轻量应用服务器 2GB RAM Ubuntu 16.04
+
 ## Multi-process
 
 ### fork
@@ -97,6 +122,8 @@ char *strrchr(const char *s, int c);
 
 它会返回指向第一个出现字符的指针。在 `mysh` 里，我们要求重定向符号和后台命令符号都出现在末尾，因此我们只需要判断是否出现这样的标志字符以及他们的位置是否在末尾就行了。
 
+这里我们需要去掉尾部的 whitespace
+
 
 
 ## Functions
@@ -105,29 +132,50 @@ char *strrchr(const char *s, int c);
 
 使用 `execvp()` 命令，可以在程序自动在相关环境变量下搜索程序位置并且执行。我们使用新的进程去运行命令，之后一直为空。
 
-我们需要将解析完的命令名称和参数作为参数，然后别忘记如果没有正常退出就报错。
+我们需要将解析完的命令名称和参数作为参数，然后别忘记如果没有正常退出就报错。解析的方法就是使用空格分隔成一些字符串，然后作为参数。
 
 ### Built-in commands
 
-内建函数是一类特殊的指令。因为子进程和父进程的内存空间是相互独立的，所以如果要改变父进程的状态（比如切换目录），就必须在父进程本身完成。内建命令通常就是需要在父进程下完成的命令。这里简单的匹配命令实现即可。
+内建函数是一类特殊的指令。因为子进程和父进程的内存空间是相互独立的，所以如果要改变父进程的状态（比如切换目录），就必须在父进程本身完成。内建命令通常就是需要在父进程下完成的命令。这里简单的匹配命令实现即可。我遇到的一个有趣的坑点是，如果在 pipe 中坚持在 shell 进程中运行内建函数，那么就可能会出现连续的内建函数，父进程的输入管道必须关闭，因为父进程和子进程的管道 file descriptor 是相反的，而要使得父进程对父进程通信，显然可能会出错。这样做看似有问题（不就读入不了东西了吗），但是由于内建函数并不会从 stdin 中读入，所以也不算是问题。
 
 ### Redirection
 
 我们使用 `dup2()` 来进行重定向。其原理是关闭原来的 file descriptor, 而成为另一个 descriptor 的副本。这里我们需要将 `STDOUT_FILENO` 重定向为要输出的文件。
 
+解析这个字符需要一点耐心，因为有各种 whitespace 会造成困扰。这里的实现不是很优雅，因为配合后面的pipe，我们希望重定向的优先级高于pipe。一开始写 `struct Cmd` 的结构时没有考虑到，因此等到重定向的时候命令指令已经被打碎成空格分隔了。这里的实现就是暴力判断了一下，分别判断 `>` 出现在参数末尾，出现在开头和单个出现的情况。如果重构代码，我肯定会选择一开始就解析出重定向的文件，然后存放于结构体中。
+
 ### Program Errors
 
-由于只有一个错误信息，这里我们只需要返回 `-1`，然后在主函数的消息循环里面打印错误信息。
+由于只有一个错误信息，这里我们只需要返回 `-1`，然后在主函数的消息循环里面打印错误信息。要注意的是，如果在子进程出错，子进程要及时调用 `exit` 推出，否则会有同时两个 `shell` 进程运行。
 
 ### Batch mode
 
 重定向 stdin 为 batch file 即可
 
+### quote
+
+我没有在作业要求中看到对处理引号的要求，但是在 pipe 的样例中发现要处理 pipe。想着这门课也不是编译原理（主要还是因为懒），我用了一个不太优雅的方法处理引号。这种方法只能处理一些单个引号（没有嵌套引号的情况）。我们成对的寻找命令字符串中的被引号括起来的部分，然后将空格替换成用户无法输入的字符，这里选择的是 `chr(7,8)`，阻止其中的空格被解析，然后再换回来。这样显然无法处理嵌套括号，也对转义符号毫无办法。如果要实现完整的括号功能，我可能会去构建有限状态自动机去解析命令字符串。
+
+### debug
+
+写代码的时候会产生各种各样的 bug，有的时候我们希望输出调试信息，但是又希望能够不输出信息看看调试的结果。这里使用的是条件编译。
+
+```c
+#define REPORT_ERR write(STDERR_FILENO, error_message, strlen(error_message));
+// #define PRINT_HEADER { if (BATCH_MODE == 0) write(STDOUT_FILENO, HEADER, strlen(HEADER)); else write(ORIGIN_STDOUT_FILENO, cmdline, strlen(cmdline)); }
+#define WRITE_FILE_MODE O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU
+// #define DEBUG
+#define REDIRECT_FLG 2
+#define _GNU_SOURCE
+```
+
+定义 `DEBUG` 宏之后，会输出调试信息。这里一直没有删除关于调试的语句，为的是以防马上发现 bugs 时又要重新打印。
+
 ## Pipe
 
 主要的工作量还是实现管道
 
-管道是进程通信的方法。如果我们没有系统实现的 pipe，如何实现 IPC 进程间通信呢？就是将一个进程写入一个文件，然后另一个进程去读。我们事先准备好一个读的 file descriptor，一个写的。然后 fork() 出一个新的进程。父进程写给子进程的话，就把子进程的 write 关掉，父进程的 read 关掉。然后我们就发现这基本就和 `pipe(int fd[])` 一样了
+管道是进程通信的方法。如果我们没有系统实现的 pipe，如何实现 IPC 进程间通信呢？就是将一个进程写入一个文件，然后另一个进程去读，当然如果需要 read 的时候引发中断，就不知道具体是怎么处理了。我们事先准备好一个读的 file descriptor，一个写的。然后 fork() 出一个新的进程。父进程写给子进程的话，就把子进程的 write 关掉，父进程的 read 关掉。开心的是系统为我们实现了 `pipe`。
 
 ### methods
 
@@ -141,9 +189,38 @@ char *strrchr(const char *s, int c);
 
 对于每一个分隔符 '|'，将两边的命令作为**子进程**执行然后重定向前者的输出为后者的输入。这样实现的好处就是非常简洁，甚至可以递归嵌套的方式处理各种情况，代码量要少得多。
 
+
+```c
+case PIPE:
+    pcmd = (struct pipecmd*)cmd;
+    if(pipe(p) < 0)
+      panic("pipe");
+    if(fork1() == 0){ // 处理左边的命令
+      close(1);
+      dup(p[1]);
+      close(p[0]);
+      close(p[1]);
+      runcmd(pcmd->left);
+    }
+    if(fork1() == 0){ // 处理右边的命令
+      close(0);
+      dup(p[0]);
+      close(p[0]);
+      close(p[1]);
+      runcmd(pcmd->right);
+    }
+    close(p[0]);
+    close(p[1]);
+    wait();
+    wait();
+    break;
+```
+
 #### different behaviors
 
 于是在这两种不同的实现下，内建函数就有了不一样的行为。比如对于命令 `cd | wc`，按照道理来说，`cd` 没有输入的情况下应该将自身工作目录转为根目录，然后没有输出。再输入 `pwd` 的时候，应该输出根目录。可是在 xv6 shell 的方式下 `cd` 命令将会在子进程，并不会改变目录。
+
+坚持在 shell 进程执行 内建函数还有一个缺点，就是无法完成父进程到父进程的通信（比如说有连续的内建函数）。不过作业要求所有的内建函数都不需要从 stdin 中输入。
 
 ### some details
 
@@ -180,47 +257,38 @@ FILE: cmd.c in method `Cmd *newCommand(char *cmdstr)`
 ```c
 int runCmdWithPipe(CmdList *head) {
     Pipe *p;
-    pid_t lastpid;
     int id = 0;
 
     int pids[500], pcnt = 0;
     char *buf = NULL;
 
     for (CmdList *t=head; t!=NULL; t=t->next) {
-        
+        dbg("in main loop");
         p = NULL;
-        if (t->next != NULL) {
+        if (t->next != NULL) { // if we need to build a pipe for the next cmd
             p = newPipe();
             t->pright = t->next->pleft = p;
         } else {
             t->pright = NULL;
         }
 
-        #ifdef DEBUG
-        setred;
-        fprintf(stderr, "id=%d pleft=%p pright=%p\n", id, t->pleft, t->pright);
-        #endif
-
         Cmd *c = t->data;
       
         if (isBuiltIn(c)) {
-            dbg("yes");
             if (t->pleft != NULL) {
-                dup2(t->pleft->pipefd[0], STDIN_FILENO);
+                closeRead(t->pleft); // should be close if the last cmd is also built-in
             }
-            int ret = tryRedirect(c);
+            int ret = tryRedirectold(c);
             if (ret == -1) return -1;
             buf = allocate(char, SIZE);
             ret = tryBuiltIn(c, buf);
             if (ret == -1) return -1;
         } else {
-            dbg("no");
             pid_t cpid = fork();
             if (cpid == -1) return -1;
             if (cpid == 0) {
                 if (t->pleft != NULL) {
                     if (buf != NULL) {
-                        dbg("close here");
                         closeWrite(t->pleft);
                     }
                     dup2(t->pleft->pipefd[0], STDIN_FILENO);
@@ -232,18 +300,18 @@ int runCmdWithPipe(CmdList *head) {
 
 
                 int ret = tryRedirect(c);
-                if (ret == -1) return -1;
+                if (ret == -1) {
+                    REPORT_ERR;
+                    exit(-1);
+                }
                 
                 ret = execvp(c->argv[0], c->argv);
+                REPORT_ERR; // error msg should be display here
                 if (t->pright != NULL) closeWrite(t->pright);
-                if (ret == -1) return -1;
-                exit(-1);
+                if (t->pleft != NULL) closeRead(t->pleft);
+                exit(-1); // exit properly
             } else {
                 if (buf != NULL) {
-                    dbg("output from last builtin");
-                    #ifdef DEBUG
-                    fprintf(stderr, "buf=%s\n", buf);
-                    #endif
                     closeRead(t->pleft);
                     write(t->pleft->pipefd[1], buf, strlen(buf));
                     free(buf); buf = NULL;
@@ -258,22 +326,23 @@ int runCmdWithPipe(CmdList *head) {
         dup2(ORIGIN_STDIN_FILENO, STDIN_FILENO);
         dup2(ORIGIN_STDOUT_FILENO, STDOUT_FILENO);
         ++id;
+        dbg("id increased");
     }
     if (!isBackground) {
-        dbg("wait");
         for (int i=0; i<pcnt; ++i) {
             waitpid(pids[i], NULL, 0);
         }
     }
     if (buf != NULL) {
-        
         write(STDOUT_FILENO, buf, strlen(buf));
         buf[strlen(buf)] = '\n';
         free(buf); buf = NULL;
-        
+
     }
+    dbg("return 0 correctly");
     return 0;
 }
+
 ```
 
 FILE: cmd.c
@@ -302,16 +371,15 @@ if (t->next != NULL) {
 
 ```c
 if (isBuiltIn(c)) {
-    dbg("yes");
     if (t->pleft != NULL) {
-        dup2(t->pleft->pipefd[0], STDIN_FILENO);
+        closeRead(t->pleft); // should be close if the last cmd is also built-in
     }
-    int ret = tryRedirect(c);
+    int ret = tryRedirectold(c);
     if (ret == -1) return -1;
     buf = allocate(char, SIZE);
     ret = tryBuiltIn(c, buf);
     if (ret == -1) return -1;
-} else {
+}
 ```
 
 普通命令，则创建新的进程
@@ -326,47 +394,43 @@ if (isBuiltIn(c)) {
 
 
 ```c
-} else {
-    dbg("no");
-    pid_t cpid = fork();
-    if (cpid == -1) return -1;
-    if (cpid == 0) {
-        if (t->pleft != NULL) {
-            if (buf != NULL) {
-                dbg("close here");
-                closeWrite(t->pleft);
-            }
-            dup2(t->pleft->pipefd[0], STDIN_FILENO);
-        }
-        if (t->pright != NULL) {
-            closeRead(t->pright);
-            dup2(t->pright->pipefd[1], STDOUT_FILENO);
-        }
-
-
-        int ret = tryRedirect(c);
-        if (ret == -1) return -1;
-        
-        ret = execvp(c->argv[0], c->argv);
-        if (t->pright != NULL) closeWrite(t->pright);
-        if (ret == -1) return -1;
-        exit(-1);
-    } else {
+pid_t cpid = fork();
+if (cpid == -1) return -1;
+if (cpid == 0) {
+    if (t->pleft != NULL) {
         if (buf != NULL) {
-            dbg("output from last builtin");
-            #ifdef DEBUG
-            fprintf(stderr, "buf=%s\n", buf);
-            #endif
-            closeRead(t->pleft);
-            write(t->pleft->pipefd[1], buf, strlen(buf));
-            free(buf); buf = NULL;
             closeWrite(t->pleft);
         }
-
-        if (t->pright != NULL)
-            closeWrite(t->pright);
-        pids[pcnt++] = cpid;
+        dup2(t->pleft->pipefd[0], STDIN_FILENO);
     }
+    if (t->pright != NULL) {
+        closeRead(t->pright);
+        dup2(t->pright->pipefd[1], STDOUT_FILENO);
+    }
+
+
+    int ret = tryRedirect(c);
+    if (ret == -1) {
+        REPORT_ERR;
+        exit(-1);
+    }
+    
+    ret = execvp(c->argv[0], c->argv);
+    REPORT_ERR; // error msg should be display here
+    if (t->pright != NULL) closeWrite(t->pright);
+    if (t->pleft != NULL) closeRead(t->pleft);
+    exit(-1); // exit properly
+} else {
+    if (buf != NULL) {
+        closeRead(t->pleft);
+        write(t->pleft->pipefd[1], buf, strlen(buf));
+        free(buf); buf = NULL;
+        closeWrite(t->pleft);
+    }
+
+    if (t->pright != NULL)
+        closeWrite(t->pright);
+    pids[pcnt++] = cpid;
 }
 ```
 
