@@ -37,3 +37,23 @@ void trim(char *s) {
     while (back >= s && (*back == ' ' || *back == '\n')) --back;
     *(back+1) = 0;
 }
+
+char *strconcat(char *a, char *b) {
+    int len = strlen(a);
+    strcpy(a+len, b);
+    len += strlen(b);
+    a[len] = 0;
+}
+
+char *compose(char **argv) {
+    int len = 0;
+    for (int i=0; argv[i]!=NULL; ++i) {
+        len += strlen(argv[i]);
+    }
+    len++;
+    char *s = allocate(char, len);
+    for (int i=0; argv[i]!=NULL; ++i)
+        strconcat(s, argv[i]);
+    s[len-1] = 0;
+    return s;
+}

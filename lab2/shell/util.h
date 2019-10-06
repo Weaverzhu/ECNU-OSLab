@@ -13,6 +13,8 @@ extern int ORIGIN_STDOUT_FILENO, ORIGIN_STDIN_FILENO;
 char **parse(char *str, const char *delim, int allowEmpty);
 void dbg(char *s);
 void trim(char *s);
+char *strconcat(char *a, char *b);
+char *compose(char **argv);
 
 #define setgreen fprintf(stderr, "\033[32;1m");
 #define setwhite fprintf(stderr, "\033[39;0m");

@@ -180,6 +180,10 @@ int tryRedirect(Cmd *c) {
     return 0;
 }
 
+int tryRedirect2(Cmd *c) {
+    
+}
+
 int runCmdWithPipe(CmdList *head) {
     Pipe *p;
     int id = 0;

@@ -5,6 +5,7 @@ pipe
 cleanxv6
 *.tar.gz
 ./vscode
+test
 
 # Prerequisites
 *.d
