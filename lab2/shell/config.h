@@ -15,7 +15,7 @@ extern int BATCH_MODE;
 
 
 #define REPORT_ERR write(STDERR_FILENO, error_message, strlen(error_message));
-#define PRINT_HEADER { if (BATCH_MODE == 0) write(STDOUT_FILENO, HEADER, strlen(HEADER)); }
+// #define PRINT_HEADER { if (BATCH_MODE == 0) write(STDOUT_FILENO, HEADER, strlen(HEADER)); else write(ORIGIN_STDOUT_FILENO, cmdline, strlen(cmdline)); }
 #define WRITE_FILE_MODE O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU
 // #define DEBUG
 #define REDIRECT_FLG 2

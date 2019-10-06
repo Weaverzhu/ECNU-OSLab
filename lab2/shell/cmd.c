@@ -179,53 +179,130 @@ int tryRedirectold(Cmd *c) {
     return 0;
 }
 
+char *strchr1(const char *s, char c) {
+    for (int i=0; s[i]!=0; ++i)
+        if (s[i] == c) return s+i;
+    return NULL;
+}
 
 int tryRedirect(Cmd *c) {
     int argc = 0;
     int pos = -1;
-    for (; c->argv[argc]!=NULL; ++argc) {
-        char *p = strchr(c->argv[argc], '>');
-        fprintf(stderr, "%s\n", c->argv[argc]);
-        if (*p != 0) {
-            if (p == c->argv[argc] && strlen(c->argv[argc]) == 1) {
-                if (c->argv[argc+1] != NULL && c->argv[argc+2] == NULL) {
-                    
-                    int fd = open(c->argv[argc+1], WRITE_FILE_MODE);
+
+    #ifdef DEBUG
+    fprintf(stderr, "in tryredirect\n");
+    outputcmd(c);
+    dbg("=========");
+    #endif
+
+    for (int i=0; c->argv[i]!=NULL; ++i) {
+        char *p = strchr(c->argv[i], '>');
+        if (p != NULL) {
+            if (strlen(c->argv[i])  == 1) { // single '>'
+                dbg("single >");
+                if (c->argv[i+1] != NULL && c->argv[i+2] == NULL) {
+                    char *filename = c->argv[i+1];
+                    int fd = open(c->argv[i+1], WRITE_FILE_MODE);
                     if (fd < 0) return -1;
                     dup2(fd, STDOUT_FILENO);
-                    free(c->argv[argc]); c->argv[argc] = NULL;
-                    return 1;
+                    free(c->argv[i]); free(c->argv[i+1]);
+                    c->argv[i] = NULL;
+                    dbg("redirect successfully");
+                    
+                    return 0;
+                } else {
+                    return -1;
                 }
-            } else {
-                char filename[SIZE];
-                int len = 0;
-                char *pos = p;
-                for (++p; *p!=0; ++p) {
-                    filename[len++] = *p;
+            } else { // together with filename
+                dbg("len > 1");
+                if ((p+1) == NULL || *(p+1) == 0) {
+                    dbg("> in the end");
+                    if (c->argv[i+1] != NULL && c->argv[i+2] == NULL) {
+                        char *filename = c->argv[i+1];
+                        int fd = open(filename, WRITE_FILE_MODE);
+                        if (fd < 0) return -1;
+                        dup2(fd, STDOUT_FILENO);
+                        free(c->argv[i+1]);
+                        c->argv[i+1] = NULL;
+                        dbg("redirect successfully1");
+                        int len = strlen(c->argv[i]);
+                        *p = 0;
+                        outputcmd(c);
+                        return 0;
+                    } else {
+                        return -1;
+                    }
+                } else {
+                    dbg("with filename");
+                    if (c->argv[i+1] != NULL) {
+                        dbg("multi files");
+                        return -1;
+                    }
+                    char *filename = allocate(char, strlen(c->argv[i]));
+                    int len = 0;
+                    char *pos = p;
+                    for (++p; *p!=0; ++p)
+                        filename[len++] = *p;
+                    filename[len] = 0;
+                    int fd = open(filename, WRITE_FILE_MODE);
+                    if (fd < 0) return -1;
+                    dup2(fd, STDOUT_FILENO);
+                    *pos = 0;
+                    if (strlen(c->argv[i])==0) c->argv[i]=NULL;
+                    dbg("redirect successfully");
+                    outputcmd(c);
+                    return 0;
                 }
-                filename[len] = 0;
-                int fd = open(filename, WRITE_FILE_MODE);
-                if (fd < 0) return -1;
-                dup2(fd, STDOUT_FILENO);
-                *pos = 0;
-                return 1;
             }
         }
+        
+        // return -1;   
     }
-    if (~pos) {
 
-        if (pos != argc-2) 
-            return -1; // > {file} is not at the end of file
-        int fd = open(c->argv[argc-1], WRITE_FILE_MODE);
+    // for (; c->argv[argc]!=NULL; ++argc) {
+    //     char *p = strchr(c->argv[argc], '>');
+        
+    //     if (*p != 0) {
+    //         fprintf(stderr, "%d %s\n", argc, c->argv[argc]);
+    //         if (p == c->argv[argc] && strlen(c->argv[argc]) == 1) {
+    //             if (c->argv[argc+1] != NULL && c->argv[argc+2] == NULL) {
+                    
+    //                 int fd = open(c->argv[argc+1], WRITE_FILE_MODE);
+    //                 if (fd < 0) return -1;
+    //                 dup2(fd, STDOUT_FILENO);
+    //                 free(c->argv[argc]); c->argv[argc] = NULL;
+    //                 return 1;
+    //             }
+    //         } else {
+    //             char filename[SIZE];
+    //             int len = 0;
+    //             char *pos = p;
+    //             for (++p; *p!=0; ++p) {
+    //                 filename[len++] = *p;
+    //             }
+    //             filename[len] = 0;
+    //             int fd = open(filename, WRITE_FILE_MODE);
+    //             if (fd < 0) return -1;
+    //             dup2(fd, STDOUT_FILENO);
+    //             *pos = 0;
+    //             return 1;
+    //         }
+    //     }
+    // }
+    // if (~pos) {
 
-        if (DBG_MODE & REDIRECT_FLG)
-            fprintf(stderr, "fd=%d\n", fd);
+    //     if (pos != argc-2) 
+    //         return -1; // > {file} is not at the end of file
+    //     int fd = open(c->argv[argc-1], WRITE_FILE_MODE);
 
-        if (fd < 0) return -1; // file open error
-        dup2(fd, STDOUT_FILENO);
-        free(c->argv[pos]); c->argv[pos] = NULL;
-        return 1;
-    }
+    //     if (DBG_MODE & REDIRECT_FLG)
+    //         fprintf(stderr, "fd=%d\n", fd);
+
+    //     if (fd < 0) return -1; // file open error
+    //     dup2(fd, STDOUT_FILENO);
+    //     free(c->argv[pos]); c->argv[pos] = NULL;
+    //     return 1;
+    // }
     return 0;
 }
 
@@ -253,7 +330,7 @@ int runCmdWithPipe(CmdList *head) {
                 // dup2(t->pleft->pipefd[0], STDIN_FILENO);
                 closeRead(t->pleft);
             }
-            int ret = tryRedirect(c);
+            int ret = tryRedirectold(c);
             if (ret == -1) return -1;
             buf = allocate(char, SIZE);
             ret = tryBuiltIn(c, buf);
@@ -275,7 +352,10 @@ int runCmdWithPipe(CmdList *head) {
 
 
                 int ret = tryRedirect(c);
-                if (ret == -1) return -1;
+                if (ret == -1) {
+                    REPORT_ERR;
+                    exit(-1);
+                }
                 
                 ret = execvp(c->argv[0], c->argv);
                 REPORT_ERR;
@@ -331,8 +411,8 @@ void outputcmd(Cmd *c) {
     fprintf(stderr, "output Cmd %p:\n", c);
     setred;
     for (int i=0; c->argv[i]!=NULL; ++i)
-        fprintf(stderr, "%s ", c->argv[i]);
-    fprintf(stderr, "\n");
+        fprintf(stderr, "%s\n", c->argv[i]);
+    // fprintf(stderr, "\n");
     setwhite;
     #endif
 }

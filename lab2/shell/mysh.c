@@ -37,14 +37,21 @@ int main(int argc, char const *argv[])
 
     while (1) {
         char cmdline[SIZE];
-        PRINT_HEADER; // write header
+        // PRINT_HEADER; // write header
+        if (!BATCH_MODE)
+            write(STDOUT_FILENO, HEADER, strlen(HEADER));
         memset(cmdline, 0, sizeof cmdline); // clear the str
         // int ret = read(SOURCE_FD, cmdline, SIZE); // read 512 bytes
         char *rets = fgets(cmdline, SIZE, f);
+        
         if (strlen(cmdline) > 512) {
             REPORT_ERR;
             continue;
         }
+
+        if (BATCH_MODE)
+            write(STDOUT_FILENO, cmdline, strlen(cmdline));
+
         if (rets == NULL) break;
         else if (strlen(cmdline) == 1) { // empty file, only a \n left
             dbg("empty command");

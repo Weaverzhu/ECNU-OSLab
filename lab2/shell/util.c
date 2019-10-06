@@ -43,6 +43,7 @@ char *strconcat(char *a, char *b) {
     strcpy(a+len, b);
     len += strlen(b);
     a[len] = 0;
+    return a;
 }
 
 char *compose(char **argv) {
