@@ -22,6 +22,21 @@
 
 ```
 
+### Run
+
+运行说明
+
+```sh
+$ make
+$ ./mysh [batch file]
+```
+
+或者直接交互
+
+```sh
+$ ./run.sh
+```
+
 ## Environment
 
 + gcc version 5.5.0 20171010 (Ubuntu 5.5.0-12ubuntu1~16.04)
@@ -128,6 +143,43 @@ char *strrchr(const char *s, int c);
 
 ## Functions
 
+### utils
+
+一些定义的辅助函数
+
+```c
+char **parse(char *str, const char *delim, int allowEmpty) {
+    dbg("parse started");
+    char *localstr = strdup(str), *token, *saveptr;
+    static char buf[SIZE >> 1][SIZE];
+    int count = 0;
+    for (char *s=localstr; ; s=NULL) {
+        token = strtok_r(s, delim, &saveptr);
+        if (token == NULL) break;
+        if (strlen(token) == 0) {
+            if (allowEmpty) continue;
+            else return NULL;
+        }
+        strcpy(buf[count++], token);
+    }
+    char **res = allocate(char*, count+1);
+    for (int i=0; i<count; ++i) {
+        res[i] = strdup(buf[i]);
+    }
+    res[count] = NULL;
+    dbg("parse completed");
+    return res;
+}
+
+#define allocate(type, size) (type*)malloc(sizeof(type) * size)
+#define match(a, b) (strcmp(a, b) == 0)
+```
+FILE util.c, util.h
+
+会根据 delim 中间的字符分割字符串，返回二维字符数组
+
+
+
 ### Running commands
 
 使用 `execvp()` 命令，可以在程序自动在相关环境变量下搜索程序位置并且执行。我们使用新的进程去运行命令，之后一直为空。
@@ -187,7 +239,7 @@ char *strrchr(const char *s, int c);
 
 #### xv6 shell
 
-对于每一个分隔符 '|'，将两边的命令作为**子进程**执行然后重定向前者的输出为后者的输入。这样实现的好处就是非常简洁，甚至可以递归嵌套的方式处理各种情况，代码量要少得多。
+对于每一个分隔符 '|'，将两边的命令作为**子进程**执行然后重定向前者的输出为后者的输入。这样实现的好处就是非常简洁，甚至可以递归嵌套的方式处理各种情况，下面是 xv6 的实现方法，代码量要少得多。
 
 
 ```c
@@ -215,6 +267,7 @@ case PIPE:
     wait();
     break;
 ```
+FILE: xv6/user/sh.c
 
 #### different behaviors
 
@@ -620,7 +673,7 @@ int getreadcount(void); // added
 
 ## test
 
-最后，我们为 `xv6` 添加一个新的程序 `readcounttest`
+最后，我们为 `xv6` 添加两个新的程序 `readcounttest, testinfork`
 
 ```c
 #include "types.h"
@@ -675,3 +728,5 @@ gets(char *buf, int max)
 ```
 
 读入多少字符就会由多少 `read` 产生，`readcounttest`加上回车共 `14` 字符，所以结果显示 `total 14 reads` 符合预测
+
+至于 testinfork，测试的是两个进程共享数据的问题，fork之后看是否会有两倍的读入，结果符合。
