@@ -1,4 +1,2 @@
-test: test.c
-	gcc test.c -o test
-clean:
-	rm -rf test.c
+main: util.c util.h main.c mem.h mem.c
+	gcc util.c util.h main.c mem.h mem.c -o main -Wall 

@@ -51,6 +51,7 @@ echo .
 echo . Weaver_zhu\'s OSLab run shell
 echo . v1.0
 echo . Powered by linux bash
+echo . Easy to run single C source file
 echo .
 echo 
 if [ $# -eq 0 ]; then
