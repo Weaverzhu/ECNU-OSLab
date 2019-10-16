@@ -8,6 +8,7 @@ cleanxv6
 test
 judger
 *.html
+bin
 
 
 # Prerequisites
