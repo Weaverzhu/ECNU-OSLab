@@ -11,6 +11,9 @@
 
 #define MAGIC 0x19260817
 #define MAGIC_N 0X12345678
+#define MIN_ALLOC 8
+
+#define F_INITIALIZE_Z
 
 int m_error;
 
@@ -108,22 +111,31 @@ void *test_alloc(int size) {
 
 void *insertBeforeNode(int size, node_t *head, node_t *b) {
     int totsize = size + sizeof(header_t);
-    int f_newnode = b->size - totsize >= sizeof(node_t) + 8;
+
+    // decide whether to add new node
+    int f_newnode = b->size - totsize >= sizeof(node_t) + MIN_ALLOC;
     
+    // b will be changed, so save b here
+    void *bprev = b->prev, *bnext = b->next;
+    int bsize = b->size;
 
-    if (b == head) {
+    // set new header
+    header_t *newheader = (header_t*)b;
+    setheader(newheader, size, bprev, b);
+    connect(bprev, newheader);
 
+    if (f_newnode) {
+        node_t *newnode = b + totsize;
+        setnode(newnode, bsize - totsize, NULL, NULL);
+        connect(newnode, bnext);
+        connect(newheader, newnode);
     } else {
-        node_t *newnode = (void*)b + totsize;
-        setnode(newnode, b->size - totsize, b->prev, b->next);
-        void *tmp = b->prev;
-        connect(newnode, b->next);
-        connect(b->prev, newnode);
-
-        // clear the memory
-        memset(b, 0, totsize);
-        return head;
+        connect(newheader, bnext);
     }
+
+#ifdef F_INITIALIZE_Z
+    memset(b, 0, totsize);
+#endif
 
     return head;
 }
@@ -137,14 +149,13 @@ header_t *makeheader(void *ptr, node_t *b, int size) {
 }
 
 void *mem_alloc(int size, int style) {
+
+    // size is alligned to 8 bytes
+    if (size < MIN_ALLOC) size = MIN_ALLOC;
+
+
     int need = size + sizeof(header_t);
     if (style == M_FIRSTFIT) {
-        // for (node_t *t=head; t!=NULL; t=t->next) {
-        //     if (t->size >= need) {
-        //         head = insertBeforeNode(size, head, t);
-        //         return t;
-        //     }
-        // }
 
         for (node_t *t=head; t!=NULL; t=t->next) {
             if (isheader(t)) continue;
