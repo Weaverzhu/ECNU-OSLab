@@ -10,7 +10,6 @@ judger
 *.html
 bin
 
-
 # Prerequisites
 *.d
 
