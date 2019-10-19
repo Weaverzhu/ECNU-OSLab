@@ -9,34 +9,51 @@
 #define handle_error(msg) \
     do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
-#define MAGIC 19260817
+#define MAGIC 0x19260817
+#define MAGIC_N 0X12345678
 
 int m_error;
 
 typedef struct __node_t {
-    int size;
     void *prev, *next;
+    int size, magic
 } node_t;
 
-
-
-typedef struct __header_t {
-    int size, magic;
-    void *prev, *next;
-} header_t;
+typedef struct __node_t header_t;
 
 void setnode(node_t *t, int size, void *prev, void *next);
 void setheader(header_t *t, int size, void *prev, void *next);
 void *test_alloc(int size);
-node_t *insertBeforeNode(int size, node_t *head, node_t *b);
-
+void *insertBeforeNode(int size, node_t *head, node_t *b);
+void connect(void *a, void *b);
+int isheader(void *a);
 
 //////////////////////////////////////////////////////////////
+
+int isheader(void *a) { // use magic to tell if a points to a header
+    header_t *pa = (header_t*)a;
+    int g = pa->magic;
+    return g == MAGIC;
+}
+
+void connect(void *a, void *b) {
+    // a & b are two nodes
+    if (a != NULL) {
+        header_t *pa = (header_t*)a;
+        pa->next = a;
+    }
+    if (b != NULL) {
+        header_t *pb = (header_t*)b;
+        pb->prev = b;
+    }
+    
+}
 
 void setnode(node_t *t, int size, void *prev, void *next) {
     t->size = size;
     t->prev = prev;
     t->next = next;
+    t->magic = MAGIC_N;
 }
 
 void setheader(header_t *t, int size, void *prev, void *next) {
@@ -48,7 +65,7 @@ void setheader(header_t *t, int size, void *prev, void *next) {
 
 
 
-node_t *head;
+void *head;
 void *ptr;
 
 
@@ -74,8 +91,8 @@ int mem_init(int size_of_region)
         exit(1); 
     }
 
-    // initialize the link list
-    head = ptr;
+    // initialize the link list, the first node is a node_t
+    head = (node_t*)ptr;
     setnode(head, size_of_region - sizeof(node_t), NULL, NULL);
 
 
@@ -89,21 +106,19 @@ void *test_alloc(int size) {
     return (void*)ptr + sizeof(node_t);
 }
 
-node_t *insertBeforeNode(int size, node_t *head, node_t *b) {
+void *insertBeforeNode(int size, node_t *head, node_t *b) {
     int totsize = size + sizeof(header_t);
+    int f_newnode = b->size - totsize >= sizeof(node_t) + 8;
+    
+
     if (b == head) {
-        // set the new head node
-        node_t *newhead = (void*)head + totsize;
-        setnode(newhead, head->size - totsize, head->prev, head->next);
 
-        // clear the memory
-        memset(head, 0, totsize); 
-
-        // return new head node
-        return newhead;
     } else {
         node_t *newnode = (void*)b + totsize;
         setnode(newnode, b->size - totsize, b->prev, b->next);
+        void *tmp = b->prev;
+        connect(newnode, b->next);
+        connect(b->prev, newnode);
 
         // clear the memory
         memset(b, 0, totsize);
@@ -113,17 +128,29 @@ node_t *insertBeforeNode(int size, node_t *head, node_t *b) {
     return head;
 }
 
+header_t *makeheader(void *ptr, node_t *b, int size) {
+    header_t *hptr = ptr;
+    setheader(hptr, size, b->prev, b);
+    
+    b->prev = hptr;
+    return hptr;
+}
+
 void *mem_alloc(int size, int style) {
     int need = size + sizeof(header_t);
     if (style == M_FIRSTFIT) {
-        
-        for (node_t *t=head; t!=NULL; t=t->next) {
-            if (t->size >= need) {
-                header_t header;
-                header.magic = MAGIC;
-                header.size = size;
-                
+        // for (node_t *t=head; t!=NULL; t=t->next) {
+        //     if (t->size >= need) {
+        //         head = insertBeforeNode(size, head, t);
+        //         return t;
+        //     }
+        // }
 
+        for (node_t *t=head; t!=NULL; t=t->next) {
+            if (isheader(t)) continue;
+            if(t->size + sizeof(node_t) >= need) {
+                head = insertBeforeNode(size, head, t);
+                return t;
             }
         }
     }
@@ -132,8 +159,13 @@ void *mem_alloc(int size, int style) {
 int mem_free(void *ptr) {
     header_t *t = ptr - sizeof(header_t);
     // int 
+    
 
     return 0;
+}
+
+void mem_dump() {
+    
 }
 
 int main(int argc, char const *argv[])
