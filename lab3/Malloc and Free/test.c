@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <assert.h>
 #include "mem.h"
 
 #define handle_error(msg) \
@@ -19,7 +20,7 @@
 #define F_INITIALIZE_Z
 #define setgreen fprintf(stderr, "\033[32;1m")
 #define setwhite fprintf(stderr, "\033[39;0m")
-#define setred fprintf(stderr, "\033[31;1m")
+#define setred fprintf(stderr, "\033[31;1m") 
 #define setblue fprintf(stderr, "\033[34;1m")
 #define setyellow fprintf(stderr, "\033[33;1m")
 
@@ -144,14 +145,9 @@ void *insertBeforeNode(int size, node_t *head, node_t *b) {
 
     if (f_newnode) {
         node_t *newnode = b + totsize;
-        dbgp(newnode); dbgp(newheader);
         setnode(newnode, bsize - totsize, NULL, NULL);
         connect(newnode, bnext);
         connect(newheader, newnode);
-        dbgp(head); dbgp(newheader);
-        dbgp(newnode);
-        dbgp(head->next);
-        dbgd(newheader->size);
     } else {
         connect(newheader, bnext);
     }
@@ -185,7 +181,7 @@ void *mem_alloc(int size, int style) {
             if(t->size + sizeof(node_t) >= need) {
                 dbgp(t);
                 head = insertBeforeNode(size, head, t);
-                return t;
+                return (void*)t + sizeof(node_t);
             }
         }
     // }
@@ -193,50 +189,61 @@ void *mem_alloc(int size, int style) {
 }
 
 int mem_free(void *ptr) {
-    // header_t *t = ptr - sizeof(header_t);
-    // int 
+    dbgp(ptr); dbgp(head);
+    // return 0;
+    node_t *p = ptr - sizeof(node_t);
     
+    assert(p->magic == MAGIC);
 
+    node_t *cur = p;
+
+    // merge with left free space
+    if (p->prev != NULL && !isheader(p->prev)) {
+        cur = p->prev;
+        cur->size += p->size + sizeof(node_t);
+        connect(cur, p->next);
+    }
+
+    // merge with right free space
+    if (p->next != NULL && !isheader(p->next)) {
+        node_t *pnext = (node_t*)p->next;
+        cur->size += pnext->size + sizeof(node_t);
+        connect(cur, pnext->next);
+    }
+    
+    // change the flag to node_t
+    cur->magic = MAGIC_N;
     return 0;
 }
 
 void mem_dump() {
 
-    // redirect stdout to stderr, backup stdout
-    int ostd = -1; dup2(STDIN_FILENO, ostd);
-    dup2(STDERR_FILENO, STDOUT_FILENO);
 
     int allocm = 0, freem = 0;
     
-    puts("");
-    puts("============mem dump: output mem alloc info ============");
+    fprintf(stderr, "");
+    fprintf(stderr, "---------- mem dump: output mem alloc info ----------\n");
     int i = 0;
-
     for (node_t *t=head; t!=NULL; t=t->next) {
         ++i;
-        printf("[%d] ", i);
+        fprintf(stderr, "[%d] ", i);
         if (isheader(t)) {
             setred;
-            printf("mem allocated here: ");
+            fprintf(stderr, "mem allocated here: ");
             allocm += t->size;
+            setwhite;
         } else {
             setgreen;
-            printf("mem available here: ");
+            fprintf(stderr, "mem available here: ");
             freem += t->size;
+            setwhite;
         }
-        dbgp(t);
-        dbgd(t->size);
-        printf("%p to %p, size %d\n", (void*)t+sizeof(node_t), (void*)t+sizeof(node_t)+t->size-1, t->size);
-    
+        fprintf(stderr, "%p to %p, size %d\n", (void*)t+sizeof(node_t), (void*)t+sizeof(node_t)+t->size-1, t->size);
     }
-    
     // reset color
     setwhite;
-    printf("=====tot mem available: %d, tot mem allocated: %d=====\n\n", freem, allocm);
+    fprintf(stderr, "--- tot mem available: %d, tot mem allocated: %d ---\n\n", freem, allocm);
 
-
-    // reset stdout
-    dup2(ostd, STDOUT_FILENO);
 }
 
 int main(int argc, char const *argv[])
@@ -245,7 +252,9 @@ int main(int argc, char const *argv[])
     mem_dump();
 
     int *a = mem_alloc(sizeof(int) * 4, M_BESTFIT);
-
+    mem_dump();
+    dbgp(a);
+    mem_free(a);
     mem_dump();
     return 0;
 }
