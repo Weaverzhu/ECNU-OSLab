@@ -174,7 +174,7 @@ void *mem_alloc(int size, int style) {
 
 
     int need = size + sizeof(header_t);
-    // if (style == M_FIRSTFIT) {
+    if (style == M_FIRSTFIT) {
 
         for (node_t *t=head; t!=NULL; t=t->next) {
             if (isheader(t)) continue;
@@ -184,7 +184,38 @@ void *mem_alloc(int size, int style) {
                 return (void*)t + sizeof(node_t);
             }
         }
-    // }
+
+        m_error = E_NO_SPACE;
+        return NULL;
+    } else if (style == M_WORSTFIT) {
+        node_t *candidate = NULL;
+        for (node_t *t=head; t!=NULL; t=t->next) {
+            if (isheader(t)) continue;
+            if (t->size + sizeof(node_t) >= need && (candidate == NULL || candidate->size < t->size)) {
+                candidate = t;
+            }
+        }
+        if (candidate == NULL) {
+            m_error = E_NO_SPACE;
+        } else {
+            head = insertBeforeNode(size, head, candidate);
+        }
+        return candidate + sizeof(node_t);
+    } else if (style == M_BESTFIT) {
+        node_t *candidate = NULL;
+        for (node_t *t=head; t!=NULL; t=t->next) {
+            if (isheader(t)) continue;
+            if (t->size + sizeof(node_t) >= need && (candidate == NULL || candidate->size > t->size)) {
+                candidate = t;
+            }
+        }
+        if (candidate == NULL) {
+            m_error = E_NO_SPACE;
+        } else {
+            head = insertBeforeNode(size, head, candidate);
+        }
+        return candidate + sizeof(node_t);
+    }
     return NULL;
 }
 
