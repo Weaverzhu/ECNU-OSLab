@@ -13,7 +13,7 @@
 
 #define setindent(x) do { for (int i=0; i<x; ++i) putchar(' '); } while(0)
 
-#define MAGIC 0x19260817
+#define MAGIC_H 0x19260817
 #define MAGIC_N 0X12345678
 #define MIN_ALLOC 8
 
@@ -24,15 +24,18 @@
 #define setblue fprintf(stderr, "\033[34;1m")
 #define setyellow fprintf(stderr, "\033[33;1m")
 
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
+#define dbg(s) {setgreen; fprintf(stderr, "%s\n", s); setwhite; }
 #define dbgd(x) do { setblue; fprintf(stderr, "%s -> %d\n", #x, x); setwhite;} while (0)
 #define dbgp(x) do { setyellow; fprintf(stderr, "%s -> %p\n", #x, x); setwhite; } while (0);
 #else
 #define dbgd(x)
 #define dbgp(x)
 #endif
+
+/////////////////////////////////////////////////////////////////////
 
 int m_error;
 
@@ -57,7 +60,7 @@ int isheader(void *a);
 int isheader(void *a) { // use magic to tell if a points to a header
     header_t *pa = (header_t*)a;
     int g = pa->magic;
-    return g == MAGIC;
+    return g == MAGIC_H;
 }
 
 void connect(void *a, void *b) {
@@ -82,7 +85,7 @@ void setnode(node_t *t, int size, void *prev, void *next) {
 
 void setheader(header_t *t, int size, void *prev, void *next) {
     t->size = size;
-    t->magic = MAGIC;
+    t->magic = MAGIC_H;
     t->prev = prev;
     t->next = next;
 }
@@ -103,6 +106,8 @@ int mem_init(int size_of_region)
     // size_of_region (in bytes) needs to be evenly divisible by the page size
     void *ptr = mmap(NULL, size_of_region, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 
+    dbgp(ptr);
+
 
     if (ptr == MAP_FAILED) { 
         perror("mmap");
@@ -111,7 +116,6 @@ int mem_init(int size_of_region)
     }
 
     // initialize the link list, the first node is a node_t
-    dbgd(size_of_region);
     head = (node_t*)ptr;
     setnode(head, size_of_region - sizeof(node_t), NULL, NULL);
 
@@ -127,7 +131,6 @@ void *test_alloc(int size) {
 }
 
 void *insertBeforeNode(int size, node_t *head, node_t *b) {
-    dbgp(head); dbgp(b);
 
     int totsize = size + sizeof(header_t);
 
@@ -144,7 +147,7 @@ void *insertBeforeNode(int size, node_t *head, node_t *b) {
     connect(bprev, newheader);
 
     if (f_newnode) {
-        node_t *newnode = b + totsize;
+        node_t *newnode = (void*)b + totsize;
         setnode(newnode, bsize - totsize, NULL, NULL);
         connect(newnode, bnext);
         connect(newheader, newnode);
@@ -153,7 +156,7 @@ void *insertBeforeNode(int size, node_t *head, node_t *b) {
     }
 
 #ifdef F_INITIALIZE_Z
-    memset(b + sizeof(node_t), 0, size);
+    memset((void*)b + sizeof(node_t), 0, size);
 #endif
 
     return head;
@@ -179,7 +182,6 @@ void *mem_alloc(int size, int style) {
         for (node_t *t=head; t!=NULL; t=t->next) {
             if (isheader(t)) continue;
             if(t->size + sizeof(node_t) >= need) {
-                dbgp(t);
                 head = insertBeforeNode(size, head, t);
                 return (void*)t + sizeof(node_t);
             }
@@ -192,29 +194,33 @@ void *mem_alloc(int size, int style) {
         for (node_t *t=head; t!=NULL; t=t->next) {
             if (isheader(t)) continue;
             if (t->size + sizeof(node_t) >= need && (candidate == NULL || candidate->size < t->size)) {
+                dbgp(t); dbgd(t->magic);
                 candidate = t;
             }
         }
+        dbgp(candidate);
         if (candidate == NULL) {
             m_error = E_NO_SPACE;
         } else {
             head = insertBeforeNode(size, head, candidate);
         }
-        return candidate + sizeof(node_t);
+        return (void*)candidate + sizeof(node_t);
     } else if (style == M_BESTFIT) {
         node_t *candidate = NULL;
         for (node_t *t=head; t!=NULL; t=t->next) {
             if (isheader(t)) continue;
             if (t->size + sizeof(node_t) >= need && (candidate == NULL || candidate->size > t->size)) {
+                dbgp(t); dbgd(t->magic);
                 candidate = t;
             }
         }
+        dbgp(candidate);
         if (candidate == NULL) {
             m_error = E_NO_SPACE;
         } else {
             head = insertBeforeNode(size, head, candidate);
         }
-        return candidate + sizeof(node_t);
+        return (void*)candidate + sizeof(node_t);
     }
     return NULL;
 }
@@ -224,7 +230,7 @@ int mem_free(void *ptr) {
     // return 0;
     node_t *p = ptr - sizeof(node_t);
     
-    assert(p->magic == MAGIC);
+    assert(p->magic == MAGIC_H);
 
     node_t *cur = p;
 
@@ -252,7 +258,7 @@ void mem_dump() {
 
     int allocm = 0, freem = 0;
     
-    fprintf(stderr, "");
+    fprintf(stderr, "\n");
     fprintf(stderr, "---------- mem dump: output mem alloc info ----------\n");
     int i = 0;
     for (node_t *t=head; t!=NULL; t=t->next) {
@@ -283,9 +289,15 @@ int main(int argc, char const *argv[])
     mem_dump();
 
     int *a = mem_alloc(sizeof(int) * 4, M_BESTFIT);
-    mem_dump();
+    int *b = mem_alloc(sizeof(int) * 6, M_WORSTFIT);
+    int *c = mem_alloc(sizeof(int) * 2, M_FIRSTFIT);
     dbgp(a);
-    mem_free(a);
+    dbgp(b)
+    dbgp(c);
+    mem_dump();
+    mem_free(b);
+    mem_dump();
+    b = mem_alloc(sizeof(int) * 8, M_WORSTFIT);
     mem_dump();
     return 0;
 }
