@@ -135,20 +135,25 @@ void *insertBeforeNode(int size, node_t *head, node_t *b) {
     int totsize = size + sizeof(header_t);
 
     // decide whether to add new node
-    int f_newnode = b->size - totsize >= sizeof(node_t) + MIN_ALLOC;
+    int f_newnode = b->size - totsize >= MIN_ALLOC;
     
     // b will be changed, so save b here
     void *bprev = b->prev, *bnext = b->next;
     int bsize = b->size;
+
+    dbgd(bsize);
 
     // set new header
     header_t *newheader = (header_t*)b;
     setheader(newheader, size, bprev, b);
     connect(bprev, newheader);
 
+    dbgd(f_newnode); dbgd(size);
     if (f_newnode) {
         node_t *newnode = (void*)b + totsize;
-        setnode(newnode, bsize - totsize, NULL, NULL);
+        setnode(newnode, bsize - size, NULL, NULL);
+        dbgp(newnode);
+        dbgd(newnode->size);
         connect(newnode, bnext);
         connect(newheader, newnode);
     } else {
@@ -289,7 +294,7 @@ int main(int argc, char const *argv[])
     mem_dump();
 
     int *a = mem_alloc(sizeof(int) * 4, M_BESTFIT);
-    int *b = mem_alloc(sizeof(int) * 6, M_WORSTFIT);
+    int *b = mem_alloc(sizeof(int) * 10, M_WORSTFIT);
     int *c = mem_alloc(sizeof(int) * 2, M_FIRSTFIT);
     dbgp(a);
     dbgp(b)
@@ -297,7 +302,7 @@ int main(int argc, char const *argv[])
     mem_dump();
     mem_free(b);
     mem_dump();
-    b = mem_alloc(sizeof(int) * 8, M_WORSTFIT);
+    b = mem_alloc(sizeof(int) * 2, M_BESTFIT);
     mem_dump();
     return 0;
 }
