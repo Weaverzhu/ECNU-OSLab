@@ -18,7 +18,15 @@
 #define setred fprintf(stderr, "\033[31;1m") 
 #define setblue fprintf(stderr, "\033[34;1m")
 #define setyellow fprintf(stderr, "\033[33;1m")
+
+// #define DEBUG
+
+
+#ifdef DEBUG
 #define dprintf(x...) fprintf(stderr, ##x)
+#else
+#define dprintf(...)
+#endif
 //------------------------------
 
 typedef long Align;
@@ -51,15 +59,15 @@ void connect(Node *prev, Node *next);
 
 int memdump_id;
 void dblock(void *l, void *r, int is_free) {
-    dprintf("[%d] ", memdump_id++);
+    printf("[%d] ", memdump_id++);
     if (is_free) {
         setgreen;
-        dprintf("Memory available: ");
-        dprintf("%p -- %p, size %lu-%lu\n", l, r-1, r-l, sizeof(Node));
+        printf("Memory available: ");
+        printf("%p -- %p, size %lu-%lu\n", l, r-1, r-l, sizeof(Node));
     } else {
         setred;
-        dprintf("Memory allocated： ");
-        dprintf("%p -- %p, size %lu+%lu\n", l, r-1, r-l-sizeof(Header), sizeof(Header));
+        printf("Memory allocated： ");
+        printf("%p -- %p, size %lu\n", l, r-1, r-l);
     }
     
     setwhite;
@@ -124,7 +132,7 @@ void * mem_alloc(int size, int style) {
 
     uint need = size + sizeof(Header);
 
-    Node *n, *prevp = NULL, *cn, *cp;
+    Node *n = NULL, *prevp = NULL, *cn = NULL, *cp = NULL;
     uint bestsize;
 
     switch (style)
@@ -188,7 +196,7 @@ void * mem_alloc(int size, int style) {
 
     dprintf("base = %p, ptr = %p, base->s.size = %u\n", base, ptr, base->s.size);
     
-    Header *h = n;
+    Header *h = (Header*)n;
     setHeader(h, size);
 
     dprintf("header->magic = %u, header = %p\n", h->s.magic, h);
@@ -200,46 +208,18 @@ void * mem_alloc(int size, int style) {
 void mem_dump() {
     memdump_id = 0;
 
-    dprintf("------------mem_dump--------------\n");
+    printf("------------mem_dump--------------\n");
     if (ptr < (void*)base) {
         dblock(ptr, base, 0);
     }
     Node *p, *prevp = NULL;
-    for (p=base; p!=NULL; p=p->s.next) {
-        if (prevp!=NULL) dblock((void*)prevp, p, 0);
+    for (p=base; p!=NULL; prevp=p,p=p->s.next) {
+        if (prevp!=NULL) dblock((void*)prevp + sizeof(Node) + prevp->s.size, p, 0);
         dblock((void*)p, (void*)p+sizeof(Node)+p->s.size, 1);
     }
-    dprintf("----------------------------------\n");
+    printf("----------------------------------\n");
 }
 
-
-// int mem_free(void *ptr) {
-//     dbgp(ptr); dbgp(head);
-//     // return 0;
-//     node_t *p = ptr - sizeof(node_t);
-    
-//     assert(p->magic == MAGIC_H);
-
-//     node_t *cur = p;
-
-//     // merge with left free space
-//     if (p->prev != NULL && !isheader(p->prev)) {
-//         cur = p->prev;
-//         cur->size += p->size + sizeof(node_t);
-//         connect(cur, p->next);
-//     }
-
-//     // merge with right free space
-//     if (p->next != NULL && !isheader(p->next)) {
-//         node_t *pnext = (node_t*)p->next;
-//         cur->size += pnext->size + sizeof(node_t);
-//         connect(cur, pnext->next);
-//     }
-    
-//     // change the flag to node_t
-//     cur->magic = MAGIC_N;
-//     return 0;
-// }
 
 int mem_free(void *ptr) {
     dprintf("ptr = %p\n", ptr);
@@ -247,7 +227,7 @@ int mem_free(void *ptr) {
     Header *p = (void*)ptr - sizeof(Header);
     if (p->s.magic != MAGIC) {
         m_error = E_BAD_POINTER;
-        return;
+        return -1;
     }
 
     Node *t = ptr - sizeof(Header);
@@ -256,7 +236,8 @@ int mem_free(void *ptr) {
     // merge with left
     Node *lp = NULL, *rp = NULL;
     for (Node *n=base; n!=NULL; n=n->s.next) {
-        if ((void*)n + n->s.size + sizeof(Header) < t) {
+        dprintf("l = %p\n", (void*)n + n->s.size + sizeof(Header));
+        if ((void*)n + n->s.size + sizeof(Header) <= (void*)t) {
             lp = n;
         } else {
             rp = n;
@@ -283,18 +264,32 @@ int mem_free(void *ptr) {
         t->s.size += sizeof(Node) + rp->s.size;
         connect(t, rp->s.next);
     }
-
+    return 0;
 }
 
 ///////////////////////////////////////////////////////////////
 
 int main(int argc, char const *argv[])
 {
+    dprintf("sizeof(char) = %lu\n", sizeof(char));
+
     mem_init(1);
     mem_dump();
     int *a = mem_alloc(sizeof(int), M_FIRSTFIT);
     mem_dump();
+    char *b = mem_alloc(sizeof(char) * 10, M_WORSTFIT);
+    mem_dump();
+    int *c = mem_alloc(sizeof(int) * 16, M_BESTFIT);
+    mem_dump();
+    mem_free(b);
+    mem_dump();
+
     mem_free(a);
+    
+
+    mem_dump();
+    mem_free(c);
+
     mem_dump();
 
     dprintf("m_error = %d\n", m_error);
