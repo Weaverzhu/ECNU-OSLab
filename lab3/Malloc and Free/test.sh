@@ -1,3 +1,7 @@
-gcc test.c mem.h -o test -Wall
-echo ===================
-time ./test
+#!/bin/bash
+set -o errexit
+python util.py mymain.c
+clear
+make
+make test
+./bin/test.out

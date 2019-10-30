@@ -19,7 +19,7 @@
 #define setblue fprintf(stderr, "\033[34;1m")
 #define setyellow fprintf(stderr, "\033[33;1m")
 
-// #define DEBUG
+#define DEBUG
 
 
 #ifdef DEBUG
@@ -161,6 +161,7 @@ void * mem_alloc(int size, int style) {
         bestsize = 0;
         for (cn=base; cn!=NULL; cp=cn, cn=cn->s.next) {
             if (cn->s.size > bestsize && cn->s.size + sizeof(Node) >= need) {
+                dprintf("found here: size %d\n", n->s.size);
                 n = cn;
                 prevp = cp;   
             }
@@ -177,11 +178,9 @@ void * mem_alloc(int size, int style) {
     }
 
     uint remain = n->s.size - need;
-    dprintf("remain = %u\n", remain);
     Node *newnode;
     if (remain >= sizeof(Node) + sizeof(Align)) {
         newnode = (void*)n + need;
-        dprintf("size = %d, need = %d, sizeof(Node) = %lu\n", size, need, sizeof(Node));
         setNode(newnode, n->s.size - need);
         connect(newnode, n->s.next);
     } else {
@@ -193,13 +192,9 @@ void * mem_alloc(int size, int style) {
     } else {
         connect(prevp, newnode);
     }
-
-    dprintf("base = %p, ptr = %p, base->s.size = %u\n", base, ptr, base->s.size);
     
     Header *h = (Header*)n;
     setHeader(h, size);
-
-    dprintf("header->magic = %u, header = %p\n", h->s.magic, h);
 
     return (void*)h + sizeof(Header);
 }
@@ -222,8 +217,6 @@ void mem_dump() {
 
 
 int mem_free(void *ptr) {
-    dprintf("ptr = %p\n", ptr);
-
     Header *p = (void*)ptr - sizeof(Header);
     if (p->s.magic != MAGIC) {
         m_error = E_BAD_POINTER;
@@ -236,7 +229,6 @@ int mem_free(void *ptr) {
     // merge with left
     Node *lp = NULL, *rp = NULL;
     for (Node *n=base; n!=NULL; n=n->s.next) {
-        dprintf("l = %p\n", (void*)n + n->s.size + sizeof(Header));
         if ((void*)n + n->s.size + sizeof(Header) <= (void*)t) {
             lp = n;
         } else {
@@ -244,8 +236,6 @@ int mem_free(void *ptr) {
             break;
         }
     }
-
-    dprintf("lp=%p, rp=%p\n", lp, rp);
 
     if (lp == NULL) {
         connect(t, base);
@@ -258,8 +248,6 @@ int mem_free(void *ptr) {
         connect(lp, t);
     }
 
-    // dprintf("%p %p\n", (void*)t + sizeof(Node) + t->s.size + 1, rp);
-    dprintf("%u\n", rp->s.size);
     if (rp != NULL && (void*)t + sizeof(Node) + t->s.size == rp) {
         t->s.size += sizeof(Node) + rp->s.size;
         connect(t, rp->s.next);
@@ -271,7 +259,6 @@ int mem_free(void *ptr) {
 
 int main(int argc, char const *argv[])
 {
-    dprintf("sizeof(char) = %lu\n", sizeof(char));
 
     mem_init(1);
     mem_dump();
@@ -282,7 +269,7 @@ int main(int argc, char const *argv[])
     int *c = mem_alloc(sizeof(int) * 16, M_BESTFIT);
     mem_dump();
     mem_free(b);
-    mem_dump();
+    mem_dump(); 
 
     mem_free(a);
     
@@ -292,6 +279,5 @@ int main(int argc, char const *argv[])
 
     mem_dump();
 
-    dprintf("m_error = %d\n", m_error);
     return 0;
 }

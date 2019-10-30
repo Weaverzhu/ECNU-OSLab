@@ -1,6 +1,10 @@
-mem: mem.h mem.c
-	gcc -c -fpic mem.c mem.h -Wall -Werror
+libmem.so : mem.o
 	gcc -shared -o libmem.so mem.o
-	gcc mem.c mem.h -Wall -Werror
-clean:
-	rm -rf mem
+mem.o : mem.c
+	gcc -c -fpic mem.c -Wall -Werror
+clean : 
+	rm -f *.o
+	rm -f *.so
+	rm -f main
+test : mymain.c
+	gcc -lmem -L. -o ./bin/test.out mymain.c -Wall -Werror -g

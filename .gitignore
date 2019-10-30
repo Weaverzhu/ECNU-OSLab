@@ -10,6 +10,7 @@ judger
 *.html
 bin
 *TODO*
+std
 
 # Prerequisites
 *.d
