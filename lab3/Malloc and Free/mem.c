@@ -19,7 +19,7 @@
 #define setblue fprintf(stderr, "\033[34;1m")
 #define setyellow fprintf(stderr, "\033[33;1m")
 
-#define DEBUG
+// #define DEBUG
 
 
 #ifdef DEBUG
@@ -151,23 +151,30 @@ void * mem_alloc(int size, int style) {
         for (cn=base; cn!=NULL; cp=cn, cn=cn->s.next) {
             if (cn->s.size < bestsize && cn->s.size + sizeof(Node) >= need) {
                 n = cn;
-                prevp = cp;   
+                prevp = cp;
+                bestsize = n->s.size;
             }
         }
         break;
     
     case M_WORSTFIT:
+        dprintf("In M_WORSTFIT, need = %d, base = %p\n", need, base);
         cn = NULL; cp = NULL;
         bestsize = 0;
         for (cn=base; cn!=NULL; cp=cn, cn=cn->s.next) {
+            // n = cn;
+            dprintf("In M_WORSTFIT, cn=%p, cp=%p, cn->s.size=%d, need=%d, bestsize=%d\n", cn, cp, cn->s.size, need, bestsize);
             if (cn->s.size > bestsize && cn->s.size + sizeof(Node) >= need) {
-                dprintf("found here: size %d\n", n->s.size);
+                dprintf("found here: size %d\n", cn->s.size);
                 n = cn;
-                prevp = cp;   
+                prevp = cp;
+                bestsize = n->s.size;
+            } else {
+                dprintf("Invalid node\n");
             }
         }
+        dprintf("n=%p, cp=%p\n", n, cp);
         break;
-    
     default:
         break;
     }
