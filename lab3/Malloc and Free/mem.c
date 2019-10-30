@@ -96,12 +96,13 @@ void setHeader(Header *h, uint size) {
 
 int mem_init(int size_of_region)
 {
-
-    if (size_of_region <= 0) {
-        perror("bad argument: size_of_region <= 0");
+    static int called = 0;
+    if (size_of_region <= 0 || called) {
         m_error = E_BAD_ARGS;
         return -1;
     }
+
+    ++called;
 
     const int PAGE_SIZE = getpagesize();
     size_of_region = (size_of_region + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;

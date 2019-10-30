@@ -1,7 +1,8 @@
 ./bin/test.out 0 10 0
 echo complted 1
-./bin/test.out 0 1000 1
+./bin/test.out 0 500 1
 echo complted 2
+exit
 ./bin/test.out 0 100000 1
 echo complted 3
 ./bin/test.out 0 500000 1
