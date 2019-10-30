@@ -6,5 +6,6 @@ clean :
 	rm -f *.o
 	rm -f *.so
 	rm -f main
+	rm -f ./bin/*
 test : mymain.c
-	gcc -lmem -L. -o ./bin/test.out mymain.c -Wall -Werror -g
+	gcc -L. -o ./bin/test.out mymain.c -Wall -lmem

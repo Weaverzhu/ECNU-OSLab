@@ -75,7 +75,7 @@ void dblock(void *l, void *r, int is_free) {
 
 static Node *base;
 int m_error;
-
+static int called = 0;
 void *ptr;
 
 ////////////////////////////function////////////////////////////
@@ -96,7 +96,7 @@ void setHeader(Header *h, uint size) {
 
 int mem_init(int size_of_region)
 {
-    static int called = 0;
+    
     if (size_of_region <= 0 || called) {
         m_error = E_BAD_ARGS;
         return -1;
@@ -129,6 +129,11 @@ int mem_init(int size_of_region)
 }
 
 void * mem_alloc(int size, int style) {
+    if (!called) {
+        m_error = E_BAD_ARGS;
+        return NULL;
+    }
+
     size = (size + sizeof(Align) - 1) / sizeof(Align) * sizeof(Align);
 
     uint need = size + sizeof(Header);
@@ -184,10 +189,12 @@ void * mem_alloc(int size, int style) {
         m_error = E_NO_SPACE;
         return NULL;
     }
-
-    uint remain = n->s.size - need;
+    dprintf("n->s.size = %d, need = %d\n", n->s.size, need);
+    uint remain = n->s.size + sizeof(Node) - need;
+    dprintf("remain = %u\n", remain);
     Node *newnode;
     if (remain >= sizeof(Node) + sizeof(Align)) {
+        dprintf("add newnode\n");
         newnode = (void*)n + need;
         setNode(newnode, n->s.size - need);
         connect(newnode, n->s.next);
@@ -209,6 +216,10 @@ void * mem_alloc(int size, int style) {
 
 
 void mem_dump() {
+    if (!called) {
+        m_error = E_BAD_ARGS;
+        return;
+    }
     memdump_id = 0;
 
     printf("------------mem_dump--------------\n");
@@ -225,6 +236,10 @@ void mem_dump() {
 
 
 int mem_free(void *ptr) {
+    if (!called) {
+        m_error = E_BAD_ARGS;
+        return -1;
+    }
     Header *p = (void*)ptr - sizeof(Header);
     if (p->s.magic != MAGIC) {
         m_error = E_BAD_POINTER;
@@ -265,27 +280,3 @@ int mem_free(void *ptr) {
 
 ///////////////////////////////////////////////////////////////
 
-int main(int argc, char const *argv[])
-{
-
-    mem_init(1);
-    mem_dump();
-    int *a = mem_alloc(sizeof(int), M_FIRSTFIT);
-    mem_dump();
-    char *b = mem_alloc(sizeof(char) * 10, M_WORSTFIT);
-    mem_dump();
-    int *c = mem_alloc(sizeof(int) * 16, M_BESTFIT);
-    mem_dump();
-    mem_free(b);
-    mem_dump(); 
-
-    mem_free(a);
-    
-
-    mem_dump();
-    mem_free(c);
-
-    mem_dump();
-
-    return 0;
-}

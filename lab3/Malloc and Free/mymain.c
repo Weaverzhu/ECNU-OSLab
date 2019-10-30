@@ -1,3 +1,43 @@
+// /*has been converted*/
+// #include <assert.h>
+// #include <stdlib.h>
+// #include <stdbool.h>
+// #include <stdio.h>
+// #include <string.h>
+// #include "mem.h"
+
+// /* IF YOU'RE TRYING TO DEBUG THE RANDOM TESTS
+//  *
+//  * you need to know that this file is compiled using your libmem.so,
+//  * and run with the following arguments:
+//  * random: <exe> 0 10 0
+//  * random2: <exe> 0 1000 1
+//  * random3: <exe> 0 100000 1
+//  * random4: <exe> 0 500000 1
+//  * random5: <exe> 0 2000000 0
+//  *
+//  */
+
+// int main(int argc, char *argv[])
+// {
+//     mem_init(4096);
+//     int *a = mem_alloc(40, M_BESTFIT);
+//     int *b = mem_alloc(40, M_BESTFIT);
+//     int *c = mem_alloc(32, M_BESTFIT);
+//     int *d = mem_alloc(40, M_BESTFIT);
+//     mem_dump();
+//     mem_free(a);
+//     mem_free(c);
+//     mem_dump();
+//     c = mem_alloc(8, M_BESTFIT);
+//     mem_dump();
+//     mem_free(d);
+//     mem_free(b);
+//     mem_dump();
+
+//     return 0;
+// }
+
 /*has been converted*/
 #include <assert.h>
 #include <stdlib.h>
@@ -51,6 +91,8 @@ int main(int argc, char* argv[]) {
 
    // most possible space, no more than max_allocs+1 unusable free chunks
    int region_size = max_allocs * max_chunk_size * 2 + max_chunk_size;
+
+   printf("log: region_size = %d\n", region_size);
 
    void** ptr = calloc(sizeof(void*), max_allocs);
    int* size = calloc(sizeof(int), max_allocs);
