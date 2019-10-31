@@ -380,7 +380,7 @@ void *mem_alloc(int size, int style)
 * prevp 前一个节点
 
 ```c
-Node *n = NULL, *prevp = NULL, *cn = NULL, *cp = NULL;
+    Node *n = NULL, *prevp = NULL, *cn = NULL, *cp = NULL;
     uint bestsize;
 
     switch (style)
@@ -436,7 +436,7 @@ Node *n = NULL, *prevp = NULL, *cn = NULL, *cp = NULL;
 最后是设置 Header，返回位置。由于我们将 Header 和分配的空间挨在一起，可以通过指针地址运算计算出位置
 
 ```c
-if (n == NULL)
+    if (n == NULL)
     {
         m_error = E_NO_SPACE;
         return NULL;
@@ -496,7 +496,7 @@ int mem_free(void *ptr)
 
 
 ```c
-Node *t = ptr - sizeof(Header);
+    Node *t = ptr - sizeof(Header);
     setNode(t, p->s.size + sizeof(Header) - sizeof(Node));
 
     // merge with left
@@ -520,7 +520,7 @@ Node *t = ptr - sizeof(Header);
 * 否则，在两个区间中插入新的区间
 
 ```c
-if (lp == NULL)
+    if (lp == NULL)
     {
         connect(t, base);
         base = t;
@@ -540,7 +540,7 @@ if (lp == NULL)
 * 如果右边的区间也相邻，则删去右边区间，并且合并
 
 ```c
-if (rp != NULL && (void *)t + sizeof(Node) + t->s.size == rp)
+    if (rp != NULL && (void *)t + sizeof(Node) + t->s.size == rp)
     {
         t->s.size += sizeof(Node) + rp->s.size;
         connect(t, rp->s.next);
