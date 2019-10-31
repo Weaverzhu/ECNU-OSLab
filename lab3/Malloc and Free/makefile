@@ -10,6 +10,6 @@ clean :
 test : mymain.c
 	mkdir -p bin
 	gcc -L. -o ./bin/test.out mymain.c -Wall -lmem
-random: random.c
+random: ran.c
 	mkdir -p bin
 	gcc -L. -o ./bin/test.out ran.c -Wall -lmem

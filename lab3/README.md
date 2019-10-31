@@ -634,7 +634,7 @@ int main()
 makefile:
 
 ```sh
-random: random.c
+random: ran.c
 	mkdir -p bin
 	gcc -L. -o ./bin/test.out ran.c -Wall -lmem
 ```
