@@ -11,6 +11,9 @@ judger
 bin
 *TODO*
 std
+/lab3/Malloc and Free/*.sh
+/lab3/Malloc and Free/*.py
+/lab3/Malloc and Free/test.c
 
 # Prerequisites
 *.d

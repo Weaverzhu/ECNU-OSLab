@@ -8,6 +8,28 @@
 2.  To do so in a performance-efficient manner.
 3.  To create a shared library.
 
+### 文件结构
+
+* mem.c 主要代码文件
+* mymain.c 基本测试文件
+* makefile
+* libconf 环境变量设置
+* ran.c 随机测试文件
+
+### 用法
+
+```sh
+make clean
+make
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. # 设置环境变量（运行当前目录下程序）
+
+make test # 基本测试
+./bin/test.out
+
+make random # 随机测试
+./bin/test.out [随机种子] [操作数量] [分配空间] # ./bin/test.out 123 1000 100000
+```
 
 ### 基本思路
 
@@ -179,6 +201,7 @@ test : mymain.c
 
 当然我们还需要设置环境变量（假如需要运行的程序也在当前目录下）
 
+libconf:
 ```sh
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
 ```
