@@ -113,8 +113,6 @@ int mem_init(int size_of_region)
         return -1;
     }
 
-    ++called;
-
     const int PAGE_SIZE = getpagesize();
     size_of_region = (size_of_region + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
     int fd = open("/dev/zero", O_RDWR);
@@ -124,10 +122,11 @@ int mem_init(int size_of_region)
 
     if (ptr == MAP_FAILED)
     {
-        perror("mmap");
         m_error = E_BAD_ARGS;
-        exit(1);
+        return -1;
     }
+
+    ++called;
 
     // initialize the link list, the first node is a node_t
     base = (Node *)ptr;
@@ -187,21 +186,13 @@ void *mem_alloc(int size, int style)
         bestsize = 0;
         for (cn = base; cn != NULL; cp = cn, cn = cn->s.next)
         {
-            // n = cn;
-            dprintf("In M_WORSTFIT, cn=%p, cp=%p, cn->s.size=%d, need=%d, bestsize=%d\n", cn, cp, cn->s.size, need, bestsize);
             if (cn->s.size > bestsize && cn->s.size + sizeof(Node) >= need)
             {
-                dprintf("found here: size %d\n", cn->s.size);
                 n = cn;
                 prevp = cp;
                 bestsize = n->s.size;
             }
-            else
-            {
-                dprintf("Invalid node\n");
-            }
         }
-        dprintf("n=%p, cp=%p\n", n, cp);
         break;
     default:
         break;
@@ -212,13 +203,10 @@ void *mem_alloc(int size, int style)
         m_error = E_NO_SPACE;
         return NULL;
     }
-    dprintf("n->s.size = %d, need = %d\n", n->s.size, need);
     uint remain = n->s.size + sizeof(Node) - need;
-    dprintf("remain = %u\n", remain);
     Node *newnode;
     if (remain >= sizeof(Node) + sizeof(Align))
     {
-        dprintf("add newnode\n");
         newnode = (void *)n + need;
         setNode(newnode, n->s.size - need);
         connect(newnode, n->s.next);
@@ -245,15 +233,15 @@ void *mem_alloc(int size, int style)
 
 void mem_dump()
 {
-    if (!called)
-    {
-        m_error = E_BAD_ARGS;
-        return;
-    }
-    memdump_id = 0;
 
     printf("------------mem_dump--------------\n");
-    if (base == NULL)
+    if (!called)
+    {
+        setred;
+        printf("Oops, you haven't successfully called mem_init yet.\n");
+        setwhite;
+    }
+    else if (base == NULL)
     {
         setred;
         printf("Oops, it seems that all space has been allocated.\n");
@@ -261,6 +249,7 @@ void mem_dump()
     }
     else
     {
+        memdump_id = 0;
         if (ptr < (void *)base)
         {
             dblock(ptr, base, 0);
