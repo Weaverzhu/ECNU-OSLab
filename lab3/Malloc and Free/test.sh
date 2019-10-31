@@ -1,6 +1,6 @@
 #!/bin/bash
 set -o errexit
-python util.py mymain.c
+# python util.py mymain.c
 clear
 make
 make test
