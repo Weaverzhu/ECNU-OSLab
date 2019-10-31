@@ -20,6 +20,14 @@
 
 ### 维护一个 free list
 
+我们需要维护内存分配操作和内存删除操作。有两个思路
+
+1.  使用链表 Node 维护空余空间，使用 Header 维护分配空间
+2.  使用 MCB 维护空余空间和分配空间
+
+实际效果使用链表运行速度在随机测试下稍快，这里使用第一种思路
+
+
 #### 申请空间
 
 `mmap` 的 manual page：
@@ -67,7 +75,6 @@ union header {
 
 #### 维护空余空间列表
 
-我们需要维护内存分配操作和内存删除操作，一个显而易见的思路是实用链表维护空余空间。
 
 ##### 分配空间
 
@@ -178,4 +185,167 @@ test : mymain.c
 
 ```sh
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
+```
+
+
+### 运行测试 & 代码详解
+
+#### mem_dump
+
+逐条打印每一条空余空间或者是分配空间，格式如下：
+
+```
+[id] Memory allocated/available： %p -- %p, （size - 16）
+```
+
+* id 表示标号从零开始
+* allocated 表示已分配，使用红色文字
+* available 表示可用，大小减去 Header 大小表示真正可用空间，使用绿色文字
+
+
+改变终端颜色，linux 终端颜色可以通过打印特殊字符改变
+```c
+
+//------------------ some tricks
+#define setgreen fprintf(stderr, "\033[32;1m")
+#define setwhite fprintf(stderr, "\033[39;0m")
+#define setred fprintf(stderr, "\033[31;1m")
+#define setblue fprintf(stderr, "\033[34;1m")
+#define setyellow fprintf(stderr, "\033[33;1m")
+```
+
+如果没有成功运行过一次 `mem_init`
+
+```
+Oops, you haven't successfully called mem_init yet.
+```
+
+如果全部空间均被占用
+
+```
+Oops, it seems that all space has been allocated.
+```
+
+打印区块信息
+
+```c
+int memdump_id;
+void dblock(void *l, void *r, int is_free)
+{
+    printf("[%d] ", memdump_id++);
+    if (is_free)
+    {
+        setgreen;
+        printf("Memory available: ");
+        printf("%p -- %p, size %lu-%lu\n", l, r - 1, r - l, sizeof(Node));
+    }
+    else
+    {
+        setred;
+        printf("Memory allocated： ");
+        printf("%p -- %p, size %lu\n", l, r - 1, r - l);
+    }
+
+    setwhite;
+}
+
+`mem_dump` 函数
+
+void mem_dump()
+{
+
+    printf("------------mem_dump--------------\n");
+    if (!called)
+    {
+        setred;
+        printf("Oops, you haven't successfully called mem_init yet.\n");
+        setwhite;
+    }
+    else if (base == NULL)
+    {
+        setred;
+        printf("Oops, it seems that all space has been allocated.\n");
+        setwhite;
+    }
+    else
+    {
+        memdump_id = 0;
+        if (ptr < (void *)base)
+        {
+            dblock(ptr, base, 0);
+        }
+        Node *p, *prevp = NULL;
+        for (p = base; p != NULL; prevp = p, p = p->s.next)
+        {
+            if (prevp != NULL)
+                dblock((void *)prevp + sizeof(Node) + prevp->s.size, p, 0);
+            dblock((void *)p, (void *)p + sizeof(Node) + p->s.size, 1);
+        }
+    }
+
+    printf("----------------------------------\n");
+}
+```
+
+##### 实际效果
+![mem_dump](./img/mem_dump.PNG)
+
+#### mem_init
+
+一些全局变量
+
+```c
+static Node *base;
+int m_error;
+static int called = 0;
+void *ptr;
+```
+
+* base：空余节点的链表头指针
+* m_error：错误标志
+* called：成功的 `mem_init` 计数
+* ptr：使用 `mmap` 分配的空间
+
+
+如果调用 `mem_init` 超过两次或者空间小于等于 0 则返回错误，否则对页表大小对齐
+
+```c
+int mem_init(int size_of_region)
+{
+
+    if (size_of_region <= 0 || called)
+    {
+        m_error = E_BAD_ARGS;
+        return -1;
+    }
+
+    const int PAGE_SIZE = getpagesize();
+    size_of_region = (size_of_region + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+```
+
+调用 `mmap`，如果结果错误，则返回错误；否则增加成功调用计数初始化链表。实际大小需要减去 Node 大小
+
+```c
+
+    int fd = open("/dev/zero", O_RDWR);
+
+    // size_of_region (in bytes) needs to be evenly divisible by the page size
+    ptr = mmap(NULL, size_of_region, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+
+    if (ptr == MAP_FAILED)
+    {
+        m_error = E_BAD_ARGS;
+        return -1;
+    }
+
+    ++called;
+
+    // initialize the link list, the first node is a node_t
+    base = (Node *)ptr;
+    setNode(base, size_of_region - sizeof(Node));
+
+    // close the device (don't worry, mapping should be unaffected)
+    close(fd);
+    return 0;
+}
 ```

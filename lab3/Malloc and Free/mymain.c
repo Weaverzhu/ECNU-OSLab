@@ -1,18 +1,20 @@
-
+/*has been converted*/
+/* check for coalesce free space (last chunk)*/
 #include <assert.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
 #include "mem.h"
 
+#define HEADER (16) // Assumes Headers will never be BIGGER than this
+#define SLACK (32)
 
-int main(int argc, char *argv[])
+int main()
 {
-    mem_init(4096);
-    int *a = mem_alloc(4080, M_BESTFIT);
+    mem_init(4090);
+    char *a = mem_alloc(10, M_BESTFIT);
+    char *b = mem_alloc(20, M_WORSTFIT);
+    char *c = mem_alloc(30, M_FIRSTFIT);
+    mem_free(b);
     mem_dump();
-    mem_free(a);
-    mem_dump();
-    return 0;
+    exit(0);
 }
