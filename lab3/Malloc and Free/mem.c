@@ -31,7 +31,7 @@
 #endif
 //------------------------------
 
-typedef long Align;
+typedef long long Align;
 typedef unsigned uint;
 typedef unsigned long long ULL;
 

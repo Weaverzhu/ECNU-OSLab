@@ -349,3 +349,261 @@ int mem_init(int size_of_region)
     return 0;
 }
 ```
+
+#### mem_alloc
+
+先验证是否成功调用过 mem_init
+
+使用 long 作为对齐，对分配内存的要求先对 8 字节对齐，然后计算总共需要的空间。
+
+```c
+typedef long long Align;
+typedef unsigned uint;
+typedef unsigned long long ULL;
+
+void *mem_alloc(int size, int style)
+{
+    if (!called)
+    {
+        m_error = E_BAD_ARGS;
+        return NULL;
+    }
+
+    size = (size + sizeof(Align) - 1) / sizeof(Align) * sizeof(Align);
+
+    uint need = size + sizeof(Header);
+```
+
+根据参数选择调度算法，遍历一边链表。由于是单向链表，我们删除节点同时也需要前一个节点的引用
+
+* n 选择插入的节点
+* prevp 前一个节点
+
+```c
+Node *n = NULL, *prevp = NULL, *cn = NULL, *cp = NULL;
+    uint bestsize;
+
+    switch (style)
+    {
+    case M_FIRSTFIT:
+        for (n = base; n != NULL; prevp = n, n = n->s.next)
+        {
+            if (n->s.size + sizeof(Node) >= need)
+            {
+                break;
+            }
+        }
+        break;
+
+    case M_BESTFIT:
+        cn = NULL;
+        cp = NULL;
+        bestsize = 0xffffffff;
+        for (cn = base; cn != NULL; cp = cn, cn = cn->s.next)
+        {
+            if (cn->s.size < bestsize && cn->s.size + sizeof(Node) >= need)
+            {
+                n = cn;
+                prevp = cp;
+                bestsize = n->s.size;
+            }
+        }
+        break;
+
+    case M_WORSTFIT:
+        dprintf("In M_WORSTFIT, need = %d, base = %p\n", need, base);
+        cn = NULL;
+        cp = NULL;
+        bestsize = 0;
+        for (cn = base; cn != NULL; cp = cn, cn = cn->s.next)
+        {
+            if (cn->s.size > bestsize && cn->s.size + sizeof(Node) >= need)
+            {
+                n = cn;
+                prevp = cp;
+                bestsize = n->s.size;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+
+```
+
+如果没找到合适的 n 说明空间不足。然后查看剩余空间是否还能插入一个空余空间的节点，至少需要一个 Node 的大小和 8 个字节（最小的内存分配空间）
+
+最后是设置 Header，返回位置。由于我们将 Header 和分配的空间挨在一起，可以通过指针地址运算计算出位置
+
+```c
+if (n == NULL)
+    {
+        m_error = E_NO_SPACE;
+        return NULL;
+    }
+    uint remain = n->s.size + sizeof(Node) - need;
+    Node *newnode;
+    if (remain >= sizeof(Node) + sizeof(Align))
+    {
+        newnode = (void *)n + need;
+        setNode(newnode, n->s.size - need);
+        connect(newnode, n->s.next);
+    }
+    else
+    {
+        newnode = n->s.next;
+    }
+
+    if (prevp == NULL)
+    {
+        base = newnode;
+    }
+    else
+    {
+        connect(prevp, newnode);
+    }
+
+    Header *h = (Header *)n;
+    setHeader(h, size);
+
+    return (void *)h + sizeof(Header);
+}
+```
+
+#### mem_free
+
+这里释放内存和合并空间也写在一起了
+
+首先检查是否调用过 `mem_init()` 和 Header 校验
+
+```c
+int mem_free(void *ptr)
+{
+    if (!called)
+    {
+        m_error = E_BAD_ARGS;
+        return -1;
+    }
+    Header *p = (void *)ptr - sizeof(Header);
+    if (p->s.magic != MAGIC)
+    {
+        m_error = E_BAD_POINTER;
+        return -1;
+    }
+```
+
+然后遍历一遍链表找出左边相邻的空余区间和右边的
+
+
+```c
+Node *t = ptr - sizeof(Header);
+    setNode(t, p->s.size + sizeof(Header) - sizeof(Node));
+
+    // merge with left
+    Node *lp = NULL, *rp = NULL;
+    for (Node *n = base; n != NULL; n = n->s.next)
+    {
+        if ((void *)n + n->s.size + sizeof(Header) <= (void *)t)
+        {
+            lp = n;
+        }
+        else
+        {
+            rp = n;
+            break;
+        }
+    }
+```
+
+* 判断是否会生成新的口语区间头节点，得到新的头节点
+* 判断是否相邻，如果是，先合并左边的区间，更改对应的大小
+* 否则，在两个区间中插入新的区间
+
+```c
+if (lp == NULL)
+    {
+        connect(t, base);
+        base = t;
+    }
+    else if ((void *)lp + sizeof(Node) + lp->s.size == t)
+    {
+        lp->s.size += sizeof(Node) + t->s.size;
+        t = lp;
+    }
+    else
+    {
+        connect(t, rp);
+        connect(lp, t);
+    }
+```
+
+* 如果右边的区间也相邻，则删去右边区间，并且合并
+
+```c
+if (rp != NULL && (void *)t + sizeof(Node) + t->s.size == rp)
+    {
+        t->s.size += sizeof(Node) + rp->s.size;
+        connect(t, rp->s.next);
+    }
+    return 0;
+}
+```
+
+
+#### 测试
+
+##### 基础测试
+
+包含基本的内存分配，错误处理，空间合并
+
+makefile 配置：
+
+```sh
+test : mymain.c
+	mkdir -p bin
+	gcc -L. -o ./bin/test.out mymain.c -Wall -lmem
+```
+
+mymain.c 代码：
+
+```c
+#include <assert.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "mem.h"
+
+int main()
+{
+    mem_init(4090);
+    mem_init(4096);
+    assert(m_error == E_BAD_ARGS);
+
+
+    int *a = mem_alloc(sizeof(int) * 8, M_BESTFIT);
+    a[7] = 1;
+    mem_dump();
+
+    char *b = mem_alloc(7, M_FIRSTFIT); // align to 8
+    char *c = mem_alloc(4080, M_WORSTFIT);
+    assert(m_error == E_NO_SPACE);
+    c = mem_alloc(20, M_WORSTFIT);
+    mem_dump();
+
+    mem_free(a);
+    mem_free(c);
+    mem_dump();
+
+    mem_free((void*)b+1);
+    assert(m_error == E_BAD_POINTER);
+
+    mem_free(b);
+    mem_dump();
+
+    exit(0);
+}
+
+```
+
+效果截图：
+
+![test1.PNG](./img/test1.PNG)
