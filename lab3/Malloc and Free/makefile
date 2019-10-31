@@ -12,4 +12,4 @@ test : mymain.c
 	gcc -L. -o ./bin/test.out mymain.c -Wall -lmem
 random: random.c
 	mkdir -p bin
-	gcc -L. -o ./bin/test.out random.c -Wall -lmem
+	gcc -L. -o ./bin/test.out ran.c -Wall -lmem

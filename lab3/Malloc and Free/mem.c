@@ -15,7 +15,7 @@
 
 #define MAGIC 0x19260817
 
-//------------------ some tricks
+//------------------ some tools
 #define setgreen fprintf(stderr, "\033[32;1m")
 #define setwhite fprintf(stderr, "\033[39;0m")
 #define setred fprintf(stderr, "\033[31;1m")
