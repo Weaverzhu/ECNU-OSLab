@@ -33,7 +33,7 @@ make random # 随机测试
 
 ### 基本思路
 
-1.  实用 `mmap()` 一次性请求一部分空间
+1.  使用 `mmap()` 一次性请求一部分空间
 2.  用这一部分连续空间分别实用 3 种不同方法分配内存
 3.  实现内存回收，和相邻的空余内存合并成新的内存
 4.  实现 `mem_dump` 方便调试，输出分配信息
@@ -44,10 +44,10 @@ make random # 随机测试
 
 我们需要维护内存分配操作和内存删除操作。有两个思路
 
-1.  使用链表 Node 维护空余空间，使用 Header 维护分配空间
-2.  使用 MCB 维护空余空间和分配空间
+1.  使用链表 Node 维护空余空间，使用 Header 维护分配空间，数据结构为链表
+2.  使用 MCB 维护空余空间和分配空间，数据结构为顺序表
 
-实际效果使用链表运行速度在随机测试下稍快，这里使用第一种思路
+实际效果使用链表运行速度在随机测试下稍快，因为如果使用后者我们不得不把分配内存和空余内存合并成一个数据结构（在频繁分配之后列表会臃肿很多），这里使用第一种思路
 
 
 #### 申请空间
@@ -67,7 +67,7 @@ SYNOPSIS
        See NOTES for information on feature test macro requirements.
 ```
 
-作用为映射一段内存到文件上，我们读写文件时相应内存空间会发生变化，而读写内存时文件也会随之同步。这里我们只是需要获取一段内存，在 `flags` 参数内添加 `MAP_PRIVATE` 表示内存是私有的不可被其他程序修改，且将内存映射到 `/dev/zero` 的 file descriptor 上，该文件可看作一个无限大小的只包含 NULL 内容的文件（随便找来的一个无意义的文件，相当于我们把拿来的内存隐藏起来。当然也可以在 `prot` 参数加入 `MAP_ANONYMOUS`，功能等效。
+作用为映射一段内存到文件上，我们读写文件时相应内存空间会发生变化，而读写内存时文件也会随之同步。这里我们只是需要获取一段内存，在 `flags` 参数内添加 `MAP_PRIVATE` 表示内存是私有的不可被其他程序修改，且将内存映射到 `/dev/zero` 的 file descriptor 上，该文件可看作一个无限大小的只包含 NULL 内容的文件（随便找来的一个无意义的文件，相当于我们只是单独申请了一段内存供使用（因为更改内存文件也不会发生变化）。当然也可以在 `prot` 参数加入 `MAP_ANONYMOUS`，功能等效。
 
 实用 `getpagesize()` 获取页表大小，将预分配空间对其上取整，然后我们就能拿到一大段内存了。
 
@@ -110,6 +110,9 @@ union node {
     } s;
     Align x;
 };
+
+
+typedef union node Node;
 ```
 
 
@@ -141,9 +144,11 @@ union header {
     } s;
     Align x;
 };
+
+typedef union header Header;
 ```
 
-为了方便起见我们把分配的内存和这个 `header` 放在一起，这样拿到指针我们不需要额外的空间去找 `header` 在哪里
+为了方便起见我们把分配的内存和这个 `Header` 放在一起，这样拿到指针我们不需要额外的空间去找 `Header` 在哪里，而是通过地址加减运算直接得到 `Header` 指针
 
 如果用户提交了错误的内存需要释放怎么办？如果是不小心清空了链表结构，那整个内存管理可就乱了套。这里的解决方案是引入 `magic` 位，当它等于一个特定的常量，我们有理由相信这段内存之前有我们之前分配好的 `Header`，否则它就是胡乱交上来的一个捣乱指针，此时设置 `m_error` 错误标记为 `E_BAD_POINTER`
 
@@ -173,11 +178,11 @@ if (p->s.magic != MAGIC) {
 
 ### 共享库
 
-当程序与静态库连接时，库中目标文件所含的所有将被程序使用的函数的机器码被copy到最终的可执行文件中。这就会导致最终生成的可执行代码量相对变 多，相当于编译器将代码补充完整了，这样运行起来相对就快些。不过会有个缺点: 占用磁盘和内存空间. 静态库会被添加到和它连接的每个程序中,而且这些程序运行时, 都会被加载到内存中. 无形中又多消耗了更多的内存空间.
+当程序与静态库连接时，库中目标文件所含的所有将被程序使用的函数的机器码被复制到最终的可执行文件中。这就会导致最终生成的可执行代码量相对变多，相当于编译器将代码补充完整了，这样运行起来相对就快些。不过会有个缺点: 占用磁盘和内存空间. 静态库会被添加到和它连接的每个程序中,而且这些程序运行时, 都会被加载到内存中. 无形中又多消耗了更多的内存空间
 
-与共享库连接的可执行文件只包含它需要的函数的引用表，而不是所有的函数代码，只有在程序执行时,那些需要的函数代码才被拷贝到内存中。这样就使可执行文 件比较小,节省磁盘空间，更进一步，操作系统使用虚拟内存，使得一份共享库驻留在内存中被多个程序使用，也同时节约了内存。不过由于运行时要去链接库会花 费一定的时间，执行速度相对会慢一些，总的来说静态库是牺牲了空间效率，换取了时间效率，共享库是牺牲了时间效率换取了空间效率。
+与共享库连接的可执行文件只包含它需要的函数的引用表，而不是所有的函数代码，只有在程序执行时,那些需要的函数代码才被拷贝到内存中。这样就使可执行文件比较小，节省磁盘空间，更进一步，操作系统使用虚拟内存，使得一份共享库驻留在内存中被多个程序使用，也同时节约了内存。不过由于运行时要去链接库会花费一定的时间，执行速度相对会慢一些总。的来说静态库是牺牲了空间效率，换取了时间效率，共享库是牺牲了时间效率换取了空间效率
 
-创建共享库的方法是先使用 `-fpic` 创建位置无关代码（全部使用相对地址，故可以在任意内存位置运行），然后使用 `-shared` 产生动态库。
+创建共享库的方法是先使用 `-fpic` 创建位置无关代码（全部使用相对地址，故可以在任意内存位置运行），然后使用 `-shared` 产生动态库
 
 makefile 如下：（假设所有代码均在 `mem.c` 中）
 
@@ -214,7 +219,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
 逐条打印每一条空余空间或者是分配空间，格式如下：
 
 ```
-[id] Memory allocated/available： %p -- %p, （size - 16）
+[%d] Memory allocated/available： %p -- %p, （size - 16）
 ```
 
 * id 表示标号从零开始
@@ -454,7 +459,17 @@ void *mem_alloc(int size, int style)
 
 最后是设置 Header，返回位置。由于我们将 Header 和分配的空间挨在一起，可以通过指针地址运算计算出位置
 
+如果需要删掉头节点，我们还需要计算出新的头节点
+
 ```c
+void connect(Node *prev, Node *next)
+{
+    if (prev != NULL)
+        prev->s.next = next;
+}
+
+...
+
     if (n == NULL)
     {
         m_error = E_NO_SPACE;
@@ -568,6 +583,7 @@ int mem_free(void *ptr)
 }
 ```
 
+这里有一个很容易写出来的 bug 是如果指针没有转换为 void* 就参与运算，加一实际上相当于加了整个类型的大小。当然如果使用 `-Wall -Werror` 编译器就会帮忙找出错误
 
 #### 测试
 
@@ -629,7 +645,7 @@ int main()
 
 #### 随机数据测试
 
-思路：同时维护两个类似指针数组，每次随机挑选一个指针进行 alloc + write 或者 free 操作。在全部操作做完之后比较内存内容，使用 stdlib.h 中的 malloc 和 free 进行对拍。
+思路：同时维护两个类似指针数组，每次随机挑选一个指针进行 可选的free + alloc + write 或者 free 操作。在全部操作做完之后比较内存内容，使用 stdlib.h 中的 malloc 和 free 进行对拍。
 
 makefile:
 
@@ -718,7 +734,8 @@ int main(int argc, char const *argv[])
                 memcpy(std[p], pos[p], size[p]); // make a copy in std
             } else {
                 setred;
-                printf("failed op %d, try to allocate %d, method %d\n", i, size[p], method); // failed to allocate
+                printf("failed op %d, try to allocate %d, method %d\n",
+                 i, size[p], method); // failed to allocate
                 setwhite;
                 ++fail;
                 m_error = 0;
@@ -735,7 +752,8 @@ int main(int argc, char const *argv[])
             }
         }
     }
-    printf("Accepted!, time used %.2fms\n, %d out of %d operations ran successfully\n", (1.0 * clock() - st) / CLOCKS_PER_SEC * 1000, suc, suc+fail);
+    printf("Accepted!, time used %.2fms\n, %d out of %d operations ran 
+    successfully\n", (1.0 * clock() - st) / CLOCKS_PER_SEC * 1000, suc, suc+fail);
     return 0;
 }
 
