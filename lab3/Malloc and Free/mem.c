@@ -47,7 +47,6 @@ union node {
 union header {
     struct
     {
-        union header *next;
         uint size, magic;
     } s;
     Align x;
@@ -68,12 +67,12 @@ void dblock(void *l, void *r, int is_free)
     {
         setgreen;
         printf("Memory available: ");
-        printf("%p -- %p, size %lu-%lu\n", l, r - 1, r - l, sizeof(Node));
+        printf("%p -- %p, size %lu\n", l, r - 1, r - l);
     }
     else
     {
         setred;
-        printf("Memory allocated： ");
+        printf("Memory allocated: ");
         printf("%p -- %p, size %lu\n", l, r - 1, r - l);
     }
 
@@ -83,7 +82,8 @@ void dblock(void *l, void *r, int is_free)
 static Node *base;
 int m_error;
 static int called = 0;
-void *ptr;
+void *hptr;
+int totsize;
 
 ////////////////////////////function////////////////////////////
 
@@ -115,12 +115,13 @@ int mem_init(int size_of_region)
 
     const int PAGE_SIZE = getpagesize();
     size_of_region = (size_of_region + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+    totsize = size_of_region;
     int fd = open("/dev/zero", O_RDWR);
 
     // size_of_region (in bytes) needs to be evenly divisible by the page size
-    ptr = mmap(NULL, size_of_region, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    hptr = mmap(NULL, size_of_region, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 
-    if (ptr == MAP_FAILED)
+    if (hptr == MAP_FAILED)
     {
         m_error = E_BAD_ARGS;
         return -1;
@@ -129,7 +130,7 @@ int mem_init(int size_of_region)
     ++called;
 
     // initialize the link list, the first node is a node_t
-    base = (Node *)ptr;
+    base = (Node *)hptr;
     setNode(base, size_of_region - sizeof(Node));
 
     // close the device (don't worry, mapping should be unaffected)
@@ -180,13 +181,12 @@ void *mem_alloc(int size, int style)
         break;
 
     case M_WORSTFIT:
-        dprintf("In M_WORSTFIT, need = %d, base = %p\n", need, base);
         cn = NULL;
         cp = NULL;
         bestsize = 0;
         for (cn = base; cn != NULL; cp = cn, cn = cn->s.next)
         {
-            if (cn->s.size > bestsize && cn->s.size + sizeof(Node) >= need)
+            if (cn->s.size >= bestsize && cn->s.size + sizeof(Node) >= need)
             {
                 n = cn;
                 prevp = cp;
@@ -205,7 +205,7 @@ void *mem_alloc(int size, int style)
     }
     uint remain = n->s.size + sizeof(Node) - need;
     Node *newnode;
-    if (remain >= sizeof(Node) + sizeof(Align))
+    if (remain >= sizeof(Node))
     {
         newnode = (void *)n + need;
         setNode(newnode, n->s.size - need);
@@ -214,6 +214,7 @@ void *mem_alloc(int size, int style)
     else
     {
         newnode = n->s.next;
+        size += remain;
     }
 
     if (prevp == NULL)
@@ -229,6 +230,18 @@ void *mem_alloc(int size, int style)
     setHeader(h, size);
 
     return (void *)h + sizeof(Header);
+}
+
+void outputAllocated(void *base, void *ed) {
+    int num = 0;
+    while (base < ed)
+    {
+        ++num;
+        Header *h = base;
+        dblock((void*)h, (void*)h + sizeof(Header) + h->s.size, 0);
+        base = base + sizeof(Header) + h->s.size;
+    }
+    // printf("dbg: get %d\n", num);
 }
 
 void mem_dump()
@@ -250,16 +263,20 @@ void mem_dump()
     else
     {
         memdump_id = 0;
-        if (ptr < (void *)base)
+        if (hptr < (void *)base)
         {
-            dblock(ptr, base, 0);
+            outputAllocated(hptr, base);
         }
         Node *p, *prevp = NULL;
         for (p = base; p != NULL; prevp = p, p = p->s.next)
         {
-            if (prevp != NULL)
-                dblock((void *)prevp + sizeof(Node) + prevp->s.size, p, 0);
+            if (prevp != NULL) {
+                outputAllocated((void *)prevp + sizeof(Node) + prevp->s.size, p);
+            }
             dblock((void *)p, (void *)p + sizeof(Node) + p->s.size, 1);
+        }
+        if ((void*)prevp+sizeof(Node)+prevp->s.size < hptr + totsize) {
+            outputAllocated((void *)prevp + sizeof(Node) + prevp->s.size, hptr + totsize);
         }
     }
 
@@ -287,7 +304,7 @@ int mem_free(void *ptr)
     Node *lp = NULL, *rp = NULL;
     for (Node *n = base; n != NULL; n = n->s.next)
     {
-        if ((void *)n + n->s.size + sizeof(Header) <= (void *)t)
+        if ((void *)n + n->s.size + sizeof(Node) <= (void *)t)
         {
             lp = n;
         }
@@ -303,7 +320,7 @@ int mem_free(void *ptr)
         connect(t, base);
         base = t;
     }
-    else if ((void *)lp + sizeof(Node) + lp->s.size == t)
+    else if ((void *)lp + lp->s.size + sizeof(Node) == (void*)t)
     {
         lp->s.size += sizeof(Node) + t->s.size;
         t = lp;
@@ -314,11 +331,11 @@ int mem_free(void *ptr)
         connect(lp, t);
     }
 
-    if (rp != NULL && (void *)t + sizeof(Node) + t->s.size == rp)
+    if (rp != NULL && (void *)t + sizeof(Node) + t->s.size == (void*)rp)
     {
         t->s.size += sizeof(Node) + rp->s.size;
         connect(t, rp->s.next);
-    }
+        }
     return 0;
 }
 
