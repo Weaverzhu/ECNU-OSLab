@@ -4,7 +4,7 @@
 
 int main(int argc, char const *argv[])
 {
-    int *a;
-    printf(1, "%d\n", a);
-    return 0;
+    char *a = NULL;
+    printf(1, "%c\n", *a);
+    exit();
 }

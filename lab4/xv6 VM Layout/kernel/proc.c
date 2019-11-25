@@ -77,23 +77,23 @@ userinit(void)
 {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
-  
   p = allocproc();
   acquire(&ptable.lock);
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
-  p->sz = PGSIZE;
+  // p->sz = PGSIZE;
+  p->sz = PGSIZE + 0x2000;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
   p->tf->es = p->tf->ds;
   p->tf->ss = p->tf->ds;
   p->tf->eflags = FL_IF;
-  p->tf->esp = PGSIZE;
-  p->tf->eip = 0;  // beginning of initcode.S
-
+  p->tf->esp = PGSIZE + 0x2000;
+  // p->tf->eip = 0;  // beginning of initcode.S
+  p->tf->eip = 0x2000;
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
