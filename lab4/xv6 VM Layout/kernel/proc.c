@@ -91,7 +91,7 @@ userinit(void)
   p->tf->es = p->tf->ds;
   p->tf->ss = p->tf->ds;
   p->tf->eflags = FL_IF;
-  p->tf->esp = PGSIZE + 0x2000;
+  p->tf->esp = p->sz;
   // p->tf->eip = 0;  // beginning of initcode.S
   p->tf->eip = 0x2000;
   safestrcpy(p->name, "initcode", sizeof(p->name));
@@ -99,6 +99,8 @@ userinit(void)
 
   p->state = RUNNABLE;
   release(&ptable.lock);
+  // cprintf("dbg: end in userinit\n");
+  // exit();
 }
 
 // Grow current process's memory by n bytes.

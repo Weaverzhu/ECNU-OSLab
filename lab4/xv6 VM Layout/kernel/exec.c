@@ -9,6 +9,7 @@
 int
 exec(char *path, char **argv)
 {
+  cprintf("start in exec\n");
   char *s, *last;
   int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
@@ -89,6 +90,8 @@ exec(char *path, char **argv)
   proc->tf->esp = sp;
   switchuvm(proc);
   freevm(oldpgdir);
+
+  cprintf("return in exec\n");
 
   return 0;
 

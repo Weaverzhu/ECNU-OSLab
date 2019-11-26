@@ -53,7 +53,7 @@ OBJDUMP := objdump
 ################################################################################
 
 # If the makefile can't find QEMU, specify its path here
-QEMU := /root/install/qemu-6.828-2.9.0/i386-softmmu/qemu-system-i386
+QEMU := /home/zt/install/qemu-6.828-2.9.0/i386-softmmu/qemu-system-i386
 
 # Try to infer the correct QEMU if not specified
 ifndef QEMU
