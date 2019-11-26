@@ -14,7 +14,7 @@ std
 /lab3/Malloc and Free/*.sh
 /lab3/Malloc and Free/*.py
 /lab3/Malloc and Free/test.c
-
+\fs
 # Prerequisites
 *.d
 

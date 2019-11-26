@@ -53,7 +53,7 @@ OBJDUMP := objdump
 ################################################################################
 
 # If the makefile can't find QEMU, specify its path here
-QEMU := qemu-system-x86_64
+QEMU := /home/zt/install/qemu-6.828-2.9.0/i386-softmmu/qemu-system-i386
 
 # Try to infer the correct QEMU if not specified
 ifndef QEMU
@@ -83,7 +83,7 @@ ifndef CPUS
 CPUS := 2
 endif
 
-QEMUOPTS := -hdb fs.img xv6.img -smp $(CPUS)
+QEMUOPTS := -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS)
 
 ################################################################################
 # Main Targets

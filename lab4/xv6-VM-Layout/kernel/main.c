@@ -61,7 +61,9 @@ mainc(void)
   // Finish setting up this processor in
   cinit();
   sti();           // enable inturrupts
+  cprintf("dbg: ready to run userinit\n");
   userinit();      // first user process
+  cprintf("dbg: suc ran userinit\n");
   scheduler();     // start running processes
 }
 

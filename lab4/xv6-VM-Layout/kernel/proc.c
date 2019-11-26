@@ -84,15 +84,15 @@ userinit(void)
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
-  p->sz = PGSIZE;
+  p->sz = PGSIZE + 0x2000;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
   p->tf->es = p->tf->ds;
   p->tf->ss = p->tf->ds;
   p->tf->eflags = FL_IF;
-  p->tf->esp = PGSIZE;
-  p->tf->eip = 0;  // beginning of initcode.S
+  p->tf->esp = PGSIZE + 0x2000;
+  p->tf->eip = 0x2000; // beginning of initcode.S
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -256,33 +256,39 @@ void
 scheduler(void)
 {
   struct proc *p;
-
-  for(;;){
+  cprintf("dbg: start to run scheduler\n");
+  for (;;)
+  {
     // Enable interrupts on this processor.
     sti();
-
+    cprintf("dbg: ran sti()\n");
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+      
+      if (p->state != RUNNABLE)
         continue;
-
+      cprintf("in dbg: %s\n", p->name);
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
       proc = p;
       switchuvm(p);
+      cprintf("dbg: switchuvm completed %s\n", p->name);
       p->state = RUNNING;
       swtch(&cpu->scheduler, proc->context);
+      cprintf("dbg: swtch completed %s\n", p->name);
       switchkvm();
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       proc = 0;
+      cprintf("dbg: good\n");
     }
     release(&ptable.lock);
 
   }
+  cprintf("dbg: exiting scheduler\n");
 }
 
 // Enter scheduler.  Must hold only ptable.lock
