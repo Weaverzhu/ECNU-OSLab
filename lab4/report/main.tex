@@ -1,0 +1,111 @@
+% !TEX encoding = UTF-8 Unicode
+\RequirePackage{fix-cm}
+\documentclass[a4paper,11pt,UTF8]{article}
+% \documentclass[a4paper,10pt,UTF8]{ctexart}
+
+\usepackage[english]{babel}
+\usepackage{fancyhdr,array,lastpage,amsmath,mathtools,enumitem,graphicx,multirow,tocbibind,longtable,makecell,varwidth,titlesec,bm,booktabs,comment,enumitem,hyperref,amsfonts}
+
+\usepackage{minted}
+ 
+\hypersetup{hidelinks}
+
+\usepackage[left=3.17cm,right=3.17cm,top=2.54cm,bottom=2.54cm]{geometry}
+\usepackage[font=footnotesize,labelfont=bf]{caption}
+\usepackage{tikz,flowchart}
+\usepackage{ctex}
+\usetikzlibrary{shapes,shapes.geometric,arrows}
+\usepackage{listings}
+\usepackage[Q=yes]{examplep}
+
+\usepackage{pgfplots}
+\usepackage{tikz}
+
+\newenvironment{sol}
+  {\par\vspace{2mm}\noindent{\bf Solution}. }
+
+\lstset{escapeinside=``, breaklines=true, frame=none, extendedchars=false, basicstyle=\ttfamily, showstringspaces=false}
+
+\usepackage{indentfirst}
+\setlength{\parindent}{2em}
+
+\pgfplotsset{compat=1.15}
+
+\lstset{escapeinside=``, breaklines=true, frame=none, extendedchars=false, basicstyle=\ttfamily, showstringspaces=false}
+\lstdefinestyle{shared}{
+    belowcaptionskip=1\baselineskip,
+    breaklines=true,
+    xleftmargin=0.2\parindent,
+    showstringspaces=false,
+    numbers=left, 
+    numberstyle=\tiny,
+    basicstyle=\fontsize{10}{12}\ttfamily,
+}
+\lstdefinestyle{bash}{
+	style=shared,
+    language=bash,
+    keywordstyle=\bfseries\color{green!40!black},
+    commentstyle=\itshape\color{red!80!black},
+    identifierstyle=\color{blue},
+    stringstyle=\color{purple!40!black},
+}
+\lstdefinestyle{cpp}{
+	style=shared,
+    language=C++,
+    keywordstyle=\bfseries\color{green!40!black},
+    commentstyle=\itshape\color{red!80!black},
+    identifierstyle=\color{blue},
+    stringstyle=\color{purple!40!black},
+}
+
+\setlength{\parskip}{1.5ex plus 0.5ex minus 0.2ex}
+\linespread{1.1}
+
+\pagestyle{plain}
+\bibliographystyle{plain}
+
+\numberwithin{equation}{section}
+\numberwithin{figure}{section}
+
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+
+% Weaver_zhu's user setting:
+\usepackage{color,xcolor}
+\setmonofont{Source Code Pro}
+\definecolor{bg}{rgb}{0.95,0.95,0.95}
+\newminted{cmake}{bgcolor=bg,linenos,fontsize=\footnotesize}
+\newminted{c}{bgcolor=bg,linenos,fontsize=\footnotesize}
+\newminted{bash}{bgcolor=bg,linenos,fontsize=\footnotesize}
+\newminted{cpp}{bgcolor=bg,linenos,fontsize=\footnotesize}
+\newminted{text}{bgcolor=bg,linenos,fontsize=\footnotesize}
+
+% ========================================
+
+
+\title{Operating System Labs: Project 3}
+\author{10175102111 \quad 朱桐 \and 10175102207 \quad 周亦然}
+% \date{2019 年 9 月 XX 日}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\renewcommand\thesection{\alph{section}}
+
+\tableofcontents
+
+\clearpage
+
+\section{Locks and Threads}
+
+\input{a/all.tex}
+
+\clearpage
+
+\section{xv6 VM Layout}
+
+\input{b/all.tex}
+
+\end{document}
