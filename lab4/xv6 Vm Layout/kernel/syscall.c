@@ -17,6 +17,7 @@
 int
 fetchint(struct proc *p, uint addr, int *ip)
 {
+  if (addr < 0x2000) return -1;
   if(addr >= p->sz || addr+4 > p->sz)
     return -1;
   *ip = *(int*)(addr);
@@ -30,7 +31,7 @@ int
 fetchstr(struct proc *p, uint addr, char **pp)
 {
   char *s, *ep;
-
+  if (addr < 0x2000) return -1;
   if(addr >= p->sz)
     return -1;
   *pp = (char*)addr;

@@ -156,13 +156,20 @@ xv6 使用如下的内存外貌
 
 用户内存从 0 开始一直到 KERNBASE。在 `./xv6 VM Layout/include/types.h` 中我们看到 NULL 被定义为 0。因此一个空指针会访问到 User text 部分，这部分的页表 flag 上有 `Present` 因此会被认为是一个合法的内存访问。现在我们希望把前两页空出来，这样当前两页将没有 `Present` flag，访问的时候 kernel 就会帮我们处理错误。
 
+于是我们的任务主要就是：使得程序 (User text) 从 0x2000 开始存放，留出两页的空间，涉及到的更改有：
+
+* exec 执行程序会涉及到程序装载
+* fork 复制出新的进程涉及到内存复制（程序装载）
+* userinit 装载第一个用户程序需要特殊操作（涉及修改makefile)
+* 修改相应的用户传入的地址的检查
+
 ##### Code: exec
 
-exec 函数首先会检查 page table directory 是否设置，以及检查 elf header。
+exec 函数首先会检查 page table directory 是否设置，以及检查 elf header。不过我们的主要关注它如何分配内存
 
 让我们先理解一些函数（无关紧要的细节已经被忽略）
 
-`./xv6 VM Layout/kernel/kalloc.c` 该函数分配一个 4096 长度的物理内存空间
+`./xv6 VM Layout/kernel/kalloc.c kalloc` 该函数分配一个 4096 长度的物理内存空间
 ```
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
@@ -182,6 +189,37 @@ kalloc(void) {
 static pte_t *
 walkpgdir(pde_t *pgdir, const void *va, int create) {
 	// ...
+}
+```
+
+`./xv6 Vm Layout/kernel/vm.c allocuvm` 为某个进程的页表分配新的空间，从 oldsz 增长到 newsz。需要注意的是，分配的方式从虚拟地址 0x00000000 开始，通过把内存大小转换成 16 进制地址恰好就是虚拟地址。
+
+```c
+// Allocate page tables and physical memory to grow process from oldsz to
+// newsz, which need not be page aligned.  Returns new size or 0 on error.
+int
+allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
+{
+  char *mem;
+  uint a;
+
+  if(newsz > USERTOP)
+    return 0;
+  if(newsz < oldsz)
+    return oldsz;
+
+  a = PGROUNDUP(oldsz);
+  for(; a < newsz; a += PGSIZE){
+    mem = kalloc();
+    if(mem == 0){
+      cprintf("allocuvm out of memory\n");
+      deallocuvm(pgdir, newsz, oldsz);
+      return 0;
+    }
+    memset(mem, 0, PGSIZE);
+    mappages(pgdir, (char*)a, PGSIZE, PADDR(mem), PTE_W|PTE_U);
+  }
+  return newsz;
 }
 ```
 
@@ -215,54 +253,60 @@ mappages(pde_t *pgdir, void *la, uint size, uint pa, int perm)
 }
 ```
 
-`./xv6 VM Layout/kernel/vm.c` 我们要改的代码在这个函数中
+这些虽然不是修改的地方，但是搞懂它们的意思很重要。让我们回到 `exec` 为新程序分配内存的地方
+
 ```c
-int
-allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
-{
-  char *mem;
-  uint a;
-
-  if(newsz > USERTOP)
-    return 0;
-  if(newsz < oldsz)
-    return oldsz;
-
-  a = PGROUNDUP(oldsz);
-  for(; a < newsz; a += PGSIZE){
-    mem = kalloc();
-    if(mem == 0){
-      cprintf("allocuvm out of memory\n");
-      deallocuvm(pgdir, newsz, oldsz);
-      return 0;
-    }
-    memset(mem, 0, PGSIZE);
-    mappages(pgdir, (char*)a, PGSIZE, PADDR(mem), PTE_W|PTE_U);
+// Load program into memory.
+  sz = 0;
+  for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
+    if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
+      goto bad;
+    if(ph.type != ELF_PROG_LOAD)
+      continue;
+    if(ph.memsz < ph.filesz)
+      goto bad;
+    if((sz = allocuvm(pgdir, sz, ph.va + ph.memsz)) == 0)
+      goto bad;
+    if(loaduvm(pgdir, (char*)ph.va, ip, ph.offset, ph.filesz) < 0)
+      goto bad;
   }
-  return newsz;
-}
+  iunlockput(ip);
+  ip = 0;
 ```
 
-虚拟地址就是 `a`，程序刚开始加载时有 `oldsz=0`，`a` 自然等于 0，这是目前从 0 开始存放用户内存空间的情况。那我们就加上 `2x4096=8192` 到 `a` 上，使得整体的虚拟内存后移了一段，这样 0 这个位置本来表示 `NULL` 的地方在页表中没有 Preset 标签，程序就会出错了。
+从 `sz=0` 开始然后再执行刚刚我们提到的 `allocuvm` 显然不是我们想要的结果，因为程序将从 0 开始装载而我们希望从 0x2000 开始，这里于是有两种思路
 
+1.  更改 allocuvm 当中的 mappages，使所有的内存空间都向后位移 0x2000
+2.  更改 exec，把程序的大小加大 0x2000
+
+事实上一开始我才用前者的策略但是稍加思考后我个人偏向后者，因为 fork 的时候会根据 proc->sz 复制内存地址。显然改变 sz 会使得事情简单很多，否则几乎要在每一个 mappages 的地方都留意是否要做更改
+
+于是我们有第一个更改的地方
 
 ```c
-  // a = PGROUNDUP(oldsz);
-  a = PGROUNDDOWN(oldsz) + 8192;
+// sz = 0;
+sz = 0x2000;
 ```
 
-但是如果我们现在编译运行 `xv6` 发现无法启动 
+看起来有疑问的地方
 
-```sh
-xv6...
-lapicinit: 1 0xfee00000
-cpu1: starting
-cpu0: starting
-pid 1 initcode: trap 14 err 7 on cpu 1 eip 0x7e addr 0xfffffff4--kill proc
-cpu1: panic: init exiting
- 104057 106095 pid 2 initcode: trap 14 err 7 on cpu 0 eip 0x7e addr 0xfffffff4--kill proc
-105cb3 0 0 0 0 0 0 0
+```c
+if((sz = allocuvm(pgdir, sz, ph.va + ph.memsz)) == 0)
+  goto bad;
 ```
+
+我们更改了初始 sz 的大小而没有懂 ph.va, ph.memsz，那么这里分配的内存会不会发生改变？其实不会，之后我们的更改会使得所有的用户程序 sz 都会增加保持一致性，使得这里留给程序的空间不会发生改变。
+
+用户程序的装在位置在 `./xv6 Vm Layout/user/makefile.mk` 需要被更改
+
+```c
+# location in memory where the program will be loaded
+USER_LDFLAGS += --section-start=.text=0x2000
+```
+
+总之，在这一部分我们确保 exec 执行的程序从 0x2000 开始存放
+
+
 
 ##### Code: fork
 
@@ -272,8 +316,152 @@ cpu1: panic: init exiting
 `./xv6 VM Layout/kernel/vm.c copyuvm`
 ```c
 for(i = 0; i < sz; i += PGSIZE){
-    // if((pte = walkpgdir(pgdir, (void*)i, 0)) == 0)
-    if((pte = walkpgdir(pgdir, (void*)i+8192, 0)) == 0)
+  if((pte = walkpgdir(pgdir, (void*)i, 0)) == 0)
+    panic("copyuvm: pte should exist");
+  if(!(*pte & PTE_P))
+    panic("copyuvm: page not present");
+  pa = PTE_ADDR(*pte);
+  if((mem = kalloc()) == 0)
+    goto bad;
+  memmove(mem, (char*)pa, PGSIZE);
+  if(mappages(d, (void*)i, PGSIZE, PADDR(mem), PTE_W|PTE_U) < 0)
+    goto bad;
+}
 ```
 
-显然这里的 shift 也需要被加上
+在之前我们让 sz 增大了 0x2000，因此这里复制地址看起来没什么问题，方便了许多。但是发现这里对每个在 sz 范围内的页表项都检查了必须要有 Present 标志，这就不是我们想要的了（前两页没有）。反正前两页我们不要，索性不复制了。这里就是第二个更改的地方
+
+```c
+// for(i = 0; i < sz; i += PGSIZE){
+for (i=0x2000; i<sz; i += PGSIZE){
+```
+
+
+##### Code: creating the first process
+
+这一部分 xv6 book 给出了很好的解释
+
+第一个 user process 当然是我们的 shell 程序了，它可以在 `./xv6 Vm Layout/user/init.c` 当中被找到
+
+第一个 user process 既不是 fork 出来的也不是某个 user process 调用 exec 而出来的，它是手动设置的。它会先执行 initcode.S 中的程序（当然也要从 0x2000开始），然后设置 trapframe 保留原始寄存器状态存放在 kernel stack 当中。从注释中我们发现，initCode 其实也是调用 exec 执行了 init 程序。我们让 userinit 的 eip 指向 initcode.S，设置进程状态为 RUNNABLE，然后交给 CPU 调度，准备让操作系统跑起来
+
+于是我们要：
+
+1.  为了保留一致性我们需要更改这个手动设置的进程大小
+2.  esp 位置需要更改为进程大小
+3.  eip 需要指向 initcode.S 的位置也就是 0x2000
+
+第三个更改的地方：
+
+```c
+p = allocproc();
+acquire(&ptable.lock);
+initproc = p;
+if((p->pgdir = setupkvm()) == 0)
+  panic("userinit: out of memory?");
+inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
+// p->sz = PGSIZE;
+p->sz = PGSIZE + 0x2000;
+memset(p->tf, 0, sizeof(*p->tf));
+p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
+p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
+p->tf->es = p->tf->ds;
+p->tf->ss = p->tf->ds;
+p->tf->eflags = FL_IF;
+// p->tf->esp = PGSIZE;
+p->tf->esp = p->sz;
+// p->tf->eip = 0;  // beginning of initcode.S
+p->tf->eip = 0x2000;
+```
+
+inituvm 装载了 init 程序，也需要更改开始位置
+
+```c
+// Load the initcode into address 0 of pgdir.
+// sz must be less than a page.
+void
+inituvm(pde_t *pgdir, char *init, uint sz)
+{
+  char *mem;
+  
+  if(sz >= PGSIZE)
+    panic("inituvm: more than a page");
+  mem = kalloc();
+  memset(mem, 0, PGSIZE);
+  // mappages(pgdir, 0, PGSIZE, PADDR(mem), PTE_W|PTE_U);
+  mappages(pgdir, (void*)0x2000, PGSIZE, PADDR(mem), PTE_W|PTE_U);
+  memmove(mem, init, sz);
+}
+```
+
+initcode 装载在哪里得找 makefile，第四个更改的地方：
+
+```c
+initcode: kernel/initcode.o
+	$(LD) $(LDFLAGS) $(KERNEL_LDFLAGS) \
+		--entry=start --section-start=.text=0x2000 \
+		--output=kernel/initcode.out kernel/initcode.o
+	$(OBJCOPY) -S -O binary kernel/initcode.out $@
+```
+
+##### one last step
+
+这一部分 xv6 book 给出了很好的解释
+
+内核需要检查用户传递过来的指针是否合法。内核态什么时候需要用户态传递的信息？系统调用
+
+系统调用从用户堆栈中获取参数。argint(), argptr(), argstr() 会调用 fetchint(), fetchstr() 根据地址获取内容。这里我们就要更新检查地址的内容，增加如果内容来自 [0,0x2000) 就会报错。
+
+
+```c
+// Fetch the int at addr from process p.
+int
+fetchint(struct proc *p, uint addr, int *ip)
+{
+  if (addr < 0x2000) return -1;
+  if(addr >= p->sz || addr+4 > p->sz)
+    return -1;
+  *ip = *(int*)(addr);
+  return 0;
+}
+
+// Fetch the nul-terminated string at addr from process p.
+// Doesn't actually copy the string - just sets *pp to point at it.
+// Returns length of string, not including nul.
+int
+fetchstr(struct proc *p, uint addr, char **pp)
+{
+  char *s, *ep;
+  if (addr < 0x2000) return -1;
+  if(addr >= p->sz)
+    return -1;
+  *pp = (char*)addr;
+  ep = (char*)p->sz;
+  for(s = *pp; s < ep; s++)
+    if(*s == 0)
+      return s - *pp;
+  return -1;
+}
+```
+
+##### outcome
+
+别忘了 **执行 `make clean`** ！ makefile 对于代码没有改变的文件（比如说 init.c, initcode.S) 不会重新编译。如果重新编译，他们还是会出现在 0x0，然后就会困惑的发现程序会在 `schedule` 的时候出错 
+
+经过一番修改后，我们运行之前的 `nulldereference`
+
+
+```sh
+xv6...
+lapicinit: 1 0xfee00000
+cpu1: starting
+cpu0: starting
+init: starting sh
+$ nulldereference
+pid 3 nulldereference: trap 14 err 4 on cpu 1 eip 0x2014 addr 0x0--kill proc
+$ 
+```
+
+当用户程序试图访问 0x0 时会发现那个地方的页表项没有 Present 标记，系统会通过 trap 退出
+
+
