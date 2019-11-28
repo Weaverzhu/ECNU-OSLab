@@ -29,7 +29,7 @@
 \usepackage{indentfirst}
 \setlength{\parindent}{2em}
 
-\pgfplotsset{compat=1.15}
+\pgfplotsset{compat=1.13}
 
 \lstset{escapeinside=``, breaklines=true, frame=none, extendedchars=false, basicstyle=\ttfamily, showstringspaces=false}
 \lstdefinestyle{shared}{
@@ -42,7 +42,7 @@
     basicstyle=\fontsize{10}{12}\ttfamily,
 }
 \lstdefinestyle{bash}{
-	style=shared,
+    style=shared,
     language=bash,
     keywordstyle=\bfseries\color{green!40!black},
     commentstyle=\itshape\color{red!80!black},
@@ -50,7 +50,7 @@
     stringstyle=\color{purple!40!black},
 }
 \lstdefinestyle{cpp}{
-	style=shared,
+    style=shared,
     language=C++,
     keywordstyle=\bfseries\color{green!40!black},
     commentstyle=\itshape\color{red!80!black},
@@ -74,11 +74,11 @@
 \usepackage{color,xcolor}
 \setmonofont{Source Code Pro}
 \definecolor{bg}{rgb}{0.95,0.95,0.95}
-\newminted{cmake}{bgcolor=bg,linenos,fontsize=\footnotesize}
-\newminted{c}{bgcolor=bg,linenos,fontsize=\footnotesize}
-\newminted{bash}{bgcolor=bg,linenos,fontsize=\footnotesize}
-\newminted{cpp}{bgcolor=bg,linenos,fontsize=\footnotesize}
-\newminted{text}{bgcolor=bg,linenos,fontsize=\footnotesize}
+\newminted{cmake}{bgcolor=bg,linenos,fontsize=\footnotesize,autogobble}
+\newminted{c}{bgcolor=bg,linenos,fontsize=\footnotesize,autogobble}
+\newminted{bash}{bgcolor=bg,linenos,fontsize=\footnotesize,autogobble}
+\newminted{cpp}{bgcolor=bg,linenos,fontsize=\footnotesize,autogobble}
+\newminted{text}{bgcolor=bg,linenos,fontsize=\footnotesize,autogobble}
 
 % ========================================
 

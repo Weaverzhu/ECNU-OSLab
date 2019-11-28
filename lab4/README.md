@@ -46,23 +46,23 @@ int main(int argc, char const *argv[])
 ```sh
 # user programs
 USER_PROGS := \
-	cat\
-	echo\
-	forktest\
-	grep\
-	init\
-	kill\
-	ln\
-	ls\
-	mkdir\
-	rm\
-	sh\
-	stressfs\
-	tester\
-	usertests\
-	wc\
-	zombie\
-	nulldereference # new program we add
+    cat\
+    echo\
+    forktest\
+    grep\
+    init\
+    kill\
+    ln\
+    ls\
+    mkdir\
+    rm\
+    sh\
+    stressfs\
+    tester\
+    usertests\
+    wc\
+    zombie\
+    nulldereference # new program we add
 ```
 
 结果如下，发现指针 `a` 指向未知的一串值
@@ -176,7 +176,7 @@ exec 函数首先会检查 page table directory 是否设置，以及检查 elf 
 // Returns 0 if the memory cannot be allocated.
 char*
 kalloc(void) {
-	// ...
+    // ...
 }
 ```
 
@@ -188,7 +188,7 @@ kalloc(void) {
 // create any required page table pages.
 static pte_t *
 walkpgdir(pde_t *pgdir, const void *va, int create) {
-	// ...
+    // ...
 }
 ```
 
@@ -398,10 +398,10 @@ initcode 装载在哪里得找 makefile，第四个更改的地方：
 
 ```c
 initcode: kernel/initcode.o
-	$(LD) $(LDFLAGS) $(KERNEL_LDFLAGS) \
-		--entry=start --section-start=.text=0x2000 \
-		--output=kernel/initcode.out kernel/initcode.o
-	$(OBJCOPY) -S -O binary kernel/initcode.out $@
+    $(LD) $(LDFLAGS) $(KERNEL_LDFLAGS) \
+        --entry=start --section-start=.text=0x2000 \
+        --output=kernel/initcode.out kernel/initcode.o
+    $(OBJCOPY) -S -O binary kernel/initcode.out $@
 ```
 
 ##### one last step
