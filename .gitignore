@@ -17,6 +17,7 @@ std
 \fs
 *.pdf
 \savepoint
+\_minted-main
 
 # xv6 binary
 mkfs
