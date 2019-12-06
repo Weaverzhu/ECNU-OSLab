@@ -49,20 +49,21 @@ exec(char *path, char **argv)
   iunlockput(ip);
   ip = 0;
 
-  // Allocate a one-page stack at the next page boundary
-  sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + PGSIZE)) == 0)
+  int stack_sz = 0;
+  // allocate one more stack at the high end of address space
+  if (allocuvm(pgdir, USERTOP-stack_sz-PGSIZE, USERTOP-stack_sz) == 0)
     goto bad;
+  stack_sz = PGSIZE;
 
   // Push argument strings, prepare rest of stack in ustack.
-  sp = sz;
+  sp = USERTOP;
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
-      goto bad;
+    goto bad;
     sp -= strlen(argv[argc]) + 1;
     sp &= ~3;
     if(copyout(pgdir, sp, argv[argc], strlen(argv[argc]) + 1) < 0)
-      goto bad;
+    goto bad;
     ustack[3+argc] = sp;
   }
   ustack[3+argc] = 0;
@@ -85,6 +86,7 @@ exec(char *path, char **argv)
   oldpgdir = proc->pgdir;
   proc->pgdir = pgdir;
   proc->sz = sz;
+  proc->stack_sz = stack_sz;
   proc->tf->eip = elf.entry;  // main
   proc->tf->esp = sp;
   switchuvm(proc);
@@ -92,7 +94,7 @@ exec(char *path, char **argv)
 
   return 0;
 
- bad:
+bad:
   if(pgdir)
     freevm(pgdir);
   if(ip)

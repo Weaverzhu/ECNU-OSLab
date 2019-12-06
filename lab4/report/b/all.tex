@@ -465,7 +465,7 @@
 修改后的代码
 
 \begin{ccode}
-    stack_sz = 0;
+    int stack_sz = 0;
     // allocate one more stack at the high end of address space
     if (allocuvm(pgdir, USERTOP-stack_sz-PGSIZE, USERTOP-stack_sz) == 0)
         goto bad;
