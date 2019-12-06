@@ -15,7 +15,18 @@ std
 /lab3/Malloc and Free/*.py
 /lab3/Malloc and Free/test.c
 \fs
+*.pdf
 \savepoint
+
+# xv6 binary
+mkfs
+kernel
+bootblock
+fs.img
+bootother
+vector.S
+xv6.img
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
