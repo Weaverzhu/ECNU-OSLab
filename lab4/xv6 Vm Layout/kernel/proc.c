@@ -112,7 +112,7 @@ growproc(int n)
 {
   uint sz;
   sz = proc->sz;
-  if (sz+n + 5*PGSIZE >= (USERTOP - proc->stack_sz))
+  if (sz+n + 5*PGSIZE > (USERTOP - proc->stack_sz))
     return -1;
   if(n > 0){
     if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0)
@@ -131,7 +131,7 @@ int growstack(int n, struct proc *p) {
   uint stack_sz = p->stack_sz;
   if (USERTOP - stack_sz-n - 5*PGSIZE < p->sz)
     return -1;
-  if (stack_sz+n > 5*PGSIZE || stack_sz+n < 0)
+  if (stack_sz+n < 0)
     return -1;
   uint newstacksz = PGROUNDUP(stack_sz+n);
   if (n > 0) {

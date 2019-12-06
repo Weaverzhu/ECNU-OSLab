@@ -54,8 +54,6 @@ int fetchstr(struct proc *p, uint addr, char **pp)
     ep = (char *)USERTOP;
   }
 
-  if (addr >= p->sz)
-    return -1;
   *pp = (char *)addr;
 
   for (s = *pp; s < ep; s++)
@@ -89,8 +87,9 @@ int argptr(int n, char **pp, int size)
   }
   else
   {
-    if (i < (USERTOP - proc->stack_sz) || i >= USERTOP || i + size >= USERTOP)
+    if (i < (USERTOP - proc->stack_sz) || i >= USERTOP || i + size > USERTOP) {
       return -1;
+    }
   }
   *pp = (char *)i;
   return 0;
@@ -102,9 +101,24 @@ int argptr(int n, char **pp, int size)
 // between this check and being used by the kernel.)
 int argstr(int n, char **pp)
 {
-  int addr;
+  int addr, i;
   if (argint(n, &addr) < 0)
     return -1;
+  i = addr;
+  if (i < proc->sz)
+  {
+    if (i < 0x2000)
+      return -1;
+    if (i + 1 > proc->sz)
+      return -1;
+  }
+  else
+  {
+    if (i < (USERTOP - proc->stack_sz) || i >= USERTOP) {
+      return -1;
+    }
+  }
+
   return fetchstr(proc, addr, pp);
 }
 
