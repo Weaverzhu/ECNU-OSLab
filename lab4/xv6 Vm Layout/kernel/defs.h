@@ -99,7 +99,7 @@ struct proc*    copyproc(struct proc*);
 void            exit(void);
 int             fork(void);
 int             growproc(int);
-int             growstack(struct proc*, int);
+int             growstack(int, struct proc*);
 int             kill(int);
 void            pinit(void);
 void            procdump(void);

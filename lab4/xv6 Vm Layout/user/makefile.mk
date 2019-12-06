@@ -17,6 +17,7 @@ USER_PROGS := \
 	usertests\
 	wc\
 	zombie\
+	stack\
 	nulldereference # new program we add
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))

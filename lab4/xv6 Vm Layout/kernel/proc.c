@@ -86,6 +86,7 @@ userinit(void)
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   // p->sz = PGSIZE;
   p->sz = PGSIZE + 0x2000;
+  p->stack_sz = 0;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -125,11 +126,24 @@ growproc(int n)
   return 0;
 }
 
-int
-growstack(struct proc *p, int n) {
 
+int growstack(int n, struct proc *p) {
+  uint stack_sz = p->stack_sz;
+  if (USERTOP - stack_sz-n - 5*PGSIZE < p->sz)
+    return -1;
+  if (stack_sz+n > 5*PGSIZE || stack_sz+n < 0)
+    return -1;
+  uint newstacksz = PGROUNDUP(stack_sz+n);
+  if (n > 0) {
+    if (allocuvm(p->pgdir, USERTOP-newstacksz, USERTOP-stack_sz) == 0)
+    return -1;
+  } else if (n < 0) {
+    if (deallocuvm(p->pgdir, USERTOP-stack_sz, USERTOP-newstacksz) == 0)
+    return -1;
+  }
+  p->stack_sz = newstacksz;
+  return 0;
 }
-
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
@@ -150,6 +164,7 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  np->stack_sz = proc->stack_sz;
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;

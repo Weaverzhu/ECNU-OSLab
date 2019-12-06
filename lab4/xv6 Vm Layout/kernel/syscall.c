@@ -14,6 +14,7 @@
 // to a saved program counter, and then the first argument.
 
 // Fetch the int at addr from process p.
+// Fetch the int at addr from process p.
 int fetchint(struct proc *p, uint addr, int *ip)
 {
   if (addr < p->sz && addr + 4 <= p->sz)
@@ -63,6 +64,16 @@ int fetchstr(struct proc *p, uint addr, char **pp)
 
   return -1;
 }
+
+// Fetch the nth 32-bit system call argument.
+int argint(int n, int *ip)
+{
+  return fetchint(proc, proc->tf->esp + 4 + 4 * n, ip);
+}
+
+// Fetch the nth word-sized system call argument as a pointer
+// to a block of memory of size n bytes.  Check that the pointer
+// lies within the process address space.
 int argptr(int n, char **pp, int size)
 {
   int i;
