@@ -65,6 +65,12 @@ main(int argc, char *argv[])
   arg = (char*) sbrk(0);
   assert(write(fd, arg, 1) == -1);
 
+  Node *arg2 = (Node*)(160 * 4096 - 100);
+  assert(write(fd, arg2, sizeof(Node)) != -1);
+
+  arg2 = (void*)arg2 + 1;
+  assert(write(fd, arg2, sizeof(Node)) == -1);
+
   printf(1, "TEST PASSED\n");
   exit();
 }

@@ -16,11 +16,11 @@
     \item 改进 xv6 使其能在访问空指针的时候使用 trap 并且 kill 掉进程
 \end{enumerate}
 
-首先设置 qemu 的路径（我的安装在 root 用户下，但是实际使用另一个账户运行，所以运行指令为 \cw{sudo make qemu-nox}）
+首先设置 qemu 的路径
 
 \begin{textcode}
     # If the makefile can't find QEMU, specify its path here
-    QEMU := /root/install/qemu-6.828-2.9.0/i386-softmmu/qemu-system-i386
+    QEMU := /home/weaverzhu/install/qemu-6.828-2.9.0/i386-softmmu/qemu-system-i386
 \end{textcode}
 
 编写一个程序，访问空指针，原代码见 
@@ -167,7 +167,8 @@
     \item \cw{./kernel/kalloc.c kalloc} 该函数分配一个 4096 长度的物理内存空间
     \item \cw{./kernel/vm.c walkpgdir} 返回页表地址
     \item \cw{./kernel/vm.c allocuvm} 为某个进程的页表分配新的空间，从 \cw{oldsz} 增长到 \cw{newsz}
-    \item \cw{./kernel/vm.c mappages} 该函数把会根据新分配的物理空间（4096长度）建立页表。也就是说会建立参数 \cw{la} (虚拟地址) 到 \cw{pa} (物理地址) 之间的映射。我们可以看到获取 \cw{la} 的地址后会检查是否该地址已经被其他物理地址占用了（\cw{panic("remap")}），否则就把 flag 加上 \cw{Present} 一起添加。由之前的定义，相邻 page table directory 本来就有相邻的地址，如果这个 page table 满了自动就会应用到下一个 page table 中。（其实也可以看作是 $2^{20}$ 个连续页表）
+    \item \cw{./kernel/vm.c mappages} 该函数把会根据新分配的物理空间（4096长度）建立页表。也就是说会建立参数 \cw{la} (虚拟地址) 到 \cw{pa} (物理地址) 之间的映射。我们可以看到获取 \cw{la} 的地址后会检查是否该地址已经被其他物理地址占用了
+    \\ （\cw{panic("remap")}），否则就把 flag 加上 \cw{Present} 一起添加。由之前的定义，相邻 page table directory 本来就有相邻的地址，如果这个 page table 满了自动就会应用到下一个 page table 中。（其实也可以看作是 $2^{20}$ 个连续页表）
 \end{itemize}
 
 回到 \cw{exec} 为新程序分配内存的地方
@@ -199,7 +200,7 @@
     \item 更改 exec，把程序的大小加大 \cw{0x2000}
 \end{enumerate}
 
-事实上一开始我才用前者的策略但是稍加思考后我个人偏向后者，因为 \cw{fork} 的时候会根据 \cw{proc->sz} 复制内存地址。显然改变 \cw{sz} 会使得事情简单很多，否则几乎要在每一个 \cw{mappages} 的地方都留意是否要做更改
+事实上一开始我才用前者的策略但是稍加思考后我个人偏向后者，因为 \cw{fork} 的时候会根据 \cw{proc->sz} 复制内存地址，之后在 \cw{system call} 中检查指针合法性也会用到 \cw{sz}。显然改变 \cw{sz} 使其和实际上的内存占用一致会使得事情简单很多，否则几乎要在每一个涉及 \cw{sz} 的地方都留意是否要做更改
 
 在进程的大小处做出更改
 
@@ -228,7 +229,7 @@
 
 \subsubsection{Code: fork}
 
-\cw{fork} 函数会创建新的进程，这个过程中会复制出新的页表，这里有一个地方也需要更改
+\cw{fork} 函数会创建新的进程，这个过程中会复制出新的页表
 
 \cw{./kernel/vm.c copyuvm}
 
@@ -247,7 +248,7 @@
     }
 \end{ccode}
 
-在之前我们让 \cw{sz} 增大了 \cw{0x2000}，因此这里复制地址看起来没什么问题，方便了许多。但是发现这里对每个在 \cw{sz} 范围内的页表项都检查了必须要有 \cw{Present} 标志，这就不是我们想要的了（前两页没有）。反正前两页我们不要，索性不复制了。这里就是第二个更改的地方
+在之前我们让 \cw{sz} 增大了 \cw{0x2000}，因此这里复制地址看起来没什么问题，方便了许多。但是发现这里对每个在 \cw{sz} 范围内的页表项都检查了必须要有 \cw{Present} 标志，这就不是我们想要的了（前两页没有）。反正前两页我们不要，索性不复制了
 
 \begin{ccode}
     // for(i = 0; i < sz; i += PGSIZE){
@@ -259,7 +260,7 @@
 第一个 user process 当然是我们的 shell 程序了，它可以在 \\
 \cw{./user/init.c} 当中被找到
 
-第一个 user process 既不是 \cw{fork} 出来的也不是某个 user process 调用 \cw{exec} 而出来的，它是手动设置的。它会先执行 \cw{initcode.S} 中的程序（这也是一个程序所以当然也要从 \cw{0x2000}开始），然后设置 trapframe 保留原始寄存器状态存放在 kernel stack 当中。从注释中我们发现，initCode 其实也是调用 \cw{exec} 执行了 init 程序。我们让 \cw{userinit} 的 eip 指向 \cw{initcode.S}，设置进程状态为 RUNNABLE，然后交给 CPU 调度，准备让操作系统跑起来
+第一个 user process 既不是 \cw{fork} 出来的也不是某个 user process 调用 \cw{exec} 而出来的，它是手动设置的。它会先执行 \cw{initcode.S} 中的程序（这也是一个程序所以当然也要从 \cw{0x2000}开始），然后设置 \cw{trap frame} 保留原始寄存器状态存放在 \cw{kernel stack} 当中。从注释中我们发现，\cw{initCode} 其实也是调用 \cw{exec} 执行了 \cw{init} 程序。我们让 \cw{userinit} 的 \cw{eip} 指向 \cw{initcode.S}，设置进程状态为 \cw{RUNNABLE}，然后交给 CPU 调度，准备让操作系统跑起来
 
 于是我们要：
 
@@ -298,19 +299,19 @@
     void
     inituvm(pde_t *pgdir, char *init, uint sz)
     {
-    char *mem;
-    
-    if(sz >= PGSIZE)
-        panic("inituvm: more than a page");
-    mem = kalloc();
-    memset(mem, 0, PGSIZE);
-    // mappages(pgdir, 0, PGSIZE, PADDR(mem), PTE_W|PTE_U);
-    mappages(pgdir, (void*)0x2000, PGSIZE, PADDR(mem), PTE_W|PTE_U);
-    memmove(mem, init, sz);
+        char *mem;
+        
+        if(sz >= PGSIZE)
+            panic("inituvm: more than a page");
+        mem = kalloc();
+        memset(mem, 0, PGSIZE);
+        // mappages(pgdir, 0, PGSIZE, PADDR(mem), PTE_W|PTE_U);
+        mappages(pgdir, (void*)0x2000, PGSIZE, PADDR(mem), PTE_W|PTE_U);
+        memmove(mem, init, sz);
     }
 \end{ccode}
 
-\cw{initcode} 装载在哪里得找 makefile，第四个更改的地方：
+\cw{initcode} 装载位置也需要更改 makefile：
 
 \begin{bashcode}
     initcode: kernel/initcode.o
@@ -581,7 +582,7 @@
 
 \subsubsection{system call}
 
-相应的检查用户传入的指针的时候也需要修改，因为地址可能不只是在 $[0, sz)$ 当中了，也坑在 $[USERTOP-stack_sz, USERTOP)$ 中
+相应的检查用户传入的指针的时候也需要修改，因为地址可能不只是在 \cw{[0, sz)} 当中了，也可能在 \cw{[USERTOP-stack_sz, USERTOP)} 中
 
 \begin{ccode}
     // Fetch the int at addr from process p.
@@ -620,7 +621,7 @@
         
         for(s = *pp; s < ep; s++)
             if(*s == 0)
-            return s - *pp;
+                return s - *pp;
         
         return -1;
     }
@@ -635,7 +636,8 @@
             if (i < 0x2000) return -1;
             if (i + size > proc->sz) return -1;
         } else {
-            if (i < (USERTOP - proc->stack_sz) || i >= USERTOP || i + size > USERTOP) {
+            if (i < (USERTOP - proc->stack_sz) || i >= USERTOP 
+            || i + size > USERTOP) {
                 return -1;
             }
         }
@@ -669,7 +671,7 @@
 
 \subsubsection{Code: growstack}
 
-接下来我们实现栈增长，按照 \cw{growproc} 的风格实现，并且在头文件也做出更改
+接下来我们实现栈增长，按照 \cw{growproc} 的风格实现，并且在头文件 \cw{defs.h} 也做出更改
 
 
 \cw{proc.c}
@@ -739,7 +741,7 @@
             rcr2());
 \end{ccode}
 
-\cw{rcr2} 函数可以获取内存地址，我们根据他的地址判断是否是因为栈空间不够而引发页表错误，然后做出相应处理，比如增加栈空间
+\cw{rcr2} 函数可以获取内存地址，我们根据地址判断是否是因为栈空间不够而引发页表错误，然后做出相应处理，比如增加栈空间
 
 \begin{ccode}
     case T_PGFLT:
@@ -779,3 +781,55 @@
     sucessful!
     $ 
 \end{textcode}
+
+\subsection{test}
+
+给出的 \cw{test case} 全部通过，自己另加入一些 test case 也通过了
+
+\begin{textcode}
+    **********************************************************************
+    Summary:
+    test build PASSED
+    (build xv6 using make)
+
+    test null PASSED (10 of 10)
+    (null)
+
+    test null2 PASSED (10 of 10)
+    (null2)
+
+    test bounds PASSED (10 of 10)
+    (bounds)
+
+    test bounds2 PASSED (10 of 10)
+    (bounds2)
+
+    test stack PASSED (10 of 10)
+    (stack)
+
+    test heap PASSED (10 of 10)
+    (heap)
+
+    test stack2 PASSED (10 of 10)
+    (stack2)
+
+    test bounds3 PASSED (10 of 10)
+    (bounds3)
+
+    test stack4 PASSED (10 of 10)
+    (stack4)
+
+    test null3 PASSED (10 of 10)
+    (null3)
+
+    test null4 PASSED (10 of 10)
+    (null4)
+
+    test bounds_ PASSED (10 of 10)
+    (bounds_)
+
+    Passed 13 of 13 tests.
+    Overall 13 of 13
+    Points 120 of 120
+\end{textcode}
+

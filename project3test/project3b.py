@@ -103,19 +103,37 @@ class myTest3(Xv6Test):
    point_value = 10
    make_qemu_args = "CPUS=1"
 
+class myTest4(Xv6Test):
+   name = "stack5"
+   description = """stack5"""
+   tester = name + ".c"
+   timeout = 30
+   point_value = 10
+   make_qemu_args = "CPUS=1"
 
+class myTest5(Xv6Test):
+   name = "stack3"
+   description = """stack3"""
+   tester = name + ".c"
+   timeout = 30
+   point_value = 10
+   make_qemu_args = "CPUS=1"
 
 
 #==============================
 additional_tests = [
-   myTest1, myTest2, myTest3
+   myTest1, myTest2, myTest3, myTest5, myTest4
 ]
 
 released_tests = [ Test0, Test1, Test2, Test3, Test4, Test6, Test7, Test8, Test10 ]
 
+
+all_test = []
+
 for x in additional_tests:
-   released_tests.append(x)
+   all_test.append(x)
 
-all_tests = additional_tests
+for x in released_tests:
+   all_test.append(x)
 
-main(Xv6Build, all_tests)
+main(Xv6Build, all_test)

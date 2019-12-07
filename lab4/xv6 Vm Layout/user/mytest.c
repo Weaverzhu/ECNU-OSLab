@@ -1,4 +1,4 @@
-/* syscall argument checks (dynamic stack boundaries) */
+/* syscall argument checks (null page, code/heap boundaries) */
 #include "types.h"
 #include "stat.h"
 #include "user.h"
@@ -14,6 +14,12 @@
    exit(); \
 }
 
+#define N 100
+
+typedef struct node {
+    char s[N];
+} Node;
+
 int
 main(int argc, char *argv[])
 {
@@ -22,62 +28,48 @@ main(int argc, char *argv[])
   int fd = open("tmp", O_WRONLY|O_CREATE);
   assert(fd != -1);
 
-  /* grow the stack a bit */
-  char* STACK = (char*)(159*4096);
-  *STACK = 'a';
-  STACK -= 4096;
-  *STACK = 'b';
-  STACK -= 4096;
-  STACK[4095] = 'c';
-  uint USERTOP = 160*4096;
-  printf(1, "grow the stack a bit\n");
+  /* grow the heap a bit (move sz around) */
+  assert((int)sbrk(4096 * 60) != -1);
 
-  /* below stack */
-  arg = (char*) STACK - 1;
+  /* at zero */
+  arg = (int*) 0x0;
+  assert(write(fd, arg, 10) == -1);
+
+  /* within null page */
+  arg = (Node*) 0x400;
+  assert(write(fd, arg, 1024) == -1);
+
+  /* below code */
+  arg = (char*) 0x1fff;
   assert(write(fd, arg, 1) == -1);
-  assert(open(arg, O_WRONLY|O_CREATE) == -1);
 
-  /* spanning stack bottom */
+  /* spanning null page and code bottom */
   assert(write(fd, arg, 2) == -1);
 
-  /* at stack */
-  arg = (char*) STACK;
+  /* at code */
+  arg = (Node*) 0x2000;
   assert(write(fd, arg, 1) != -1);
-  strcpy(arg, "bar");
-  printf(1, "%s\n", arg);
-  fd = open(arg, O_WRONLY|O_CREATE);
-  assert(fd != -1);
-  assert(unlink(arg) != -1);
 
-  /* within stack */
-  arg = (char*) (STACK + 6*1024);
+  /* within code/heap */
+  arg = (char*) (((uint)sbrk(0) - 0x2000) / 2);
   assert(write(fd, arg, 40) != -1);
-  strcpy(arg, "foo");
-  fd = open(arg, O_WRONLY|O_CREATE);
-  assert(fd != -1);
-  assert(unlink(arg) != -1);
 
-  /* at stack top */
-  arg = (char*) USERTOP-1;
+  /* at heap top */
+  arg = (char*) ((uint)sbrk(0)-1);
   assert(write(fd, arg, 1) != -1);
-  arg = (char*) USERTOP-2;
-  assert(arg[0] == '\0');
-  strcpy(arg, "x");
-  fd = open(arg, O_WRONLY|O_CREATE);
-  assert(fd != -1);
-  assert(unlink(arg) != -1);
-  arg[0] = '\0';
 
-  /* spanning stack top */
-  arg = (char*) USERTOP-1;
+  /* spanning heap top */
   assert(write(fd, arg, 2) == -1);
-  arg[0] = 'a';
-  assert(open(arg, O_WRONLY|O_CREATE) == -1);
 
-  /* above stack top */
-  arg = (char*) USERTOP;
+  /* above heap top */
+  arg = (char*) sbrk(0);
   assert(write(fd, arg, 1) == -1);
-  assert(open(arg, O_WRONLY|O_CREATE) == -1);
+
+  Node *arg2 = (Node*)(160 * 4096 - 100);
+  assert(write(fd, arg2, sizeof(Node)) != -1);
+
+  arg2 = (void*)arg2 + 1;
+  assert(write(fd, arg2, sizeof(Node)) == -1);
 
   printf(1, "TEST PASSED\n");
   exit();
