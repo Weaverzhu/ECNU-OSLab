@@ -109,13 +109,13 @@
     //  \--- PDX(la) --/ \--- PTX(la) --/
         
     // page directory index
-    #define PDX(la)		(((uint)(la) >> PDXSHIFT) & 0x3FF)
+    #define PDX(la)      (((uint)(la) >> PDXSHIFT) & 0x3FF)
         
     // page table index
-    #define PTX(la)		(((uint)(la) >> PTXSHIFT) & 0x3FF)
+    #define PTX(la)      (((uint)(la) >> PTXSHIFT) & 0x3FF)
         
     // construct linear address from indexes and offset
-    #define PGADDR(d, t, o)	((uint)((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
+    #define PGADDR(d, t, o)   ((uint)((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
 \end{ccode}
 
 每个页表项需要一些 flag 设置他们的属性，比如说 Writeable 表示可以写入，Present 表示这个页表已经被用到了。还可以指定被当成缓存时的各种策略
@@ -124,19 +124,19 @@
 
 \begin{ccode}
     // Page table/directory entry flags.
-    #define PTE_P		0x001	// Present
-    #define PTE_W		0x002	// Writeable
-    #define PTE_U		0x004	// User
-    #define PTE_PWT		0x008	// Write-Through
-    #define PTE_PCD		0x010	// Cache-Disable
-    #define PTE_A		0x020	// Accessed
-    #define PTE_D		0x040	// Dirty
-    #define PTE_PS		0x080	// Page Size
-    #define PTE_MBZ		0x180	// Bits must be zero
+    #define PTE_P      0x001   // Present
+    #define PTE_W      0x002   // Writeable
+    #define PTE_U      0x004   // User
+    #define PTE_PWT    0x008   // Write-Through
+    #define PTE_PCD    0x010   // Cache-Disable
+    #define PTE_A      0x020   // Accessed
+    #define PTE_D      0x040   // Dirty
+    #define PTE_PS     0x080   // Page Size
+    #define PTE_MBZ    0x180   // Bits must be zero
 \end{ccode}
 
 \subsubsection{memory layout}
-
+ 
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.8\textwidth]{img/memlayout.PNG}
