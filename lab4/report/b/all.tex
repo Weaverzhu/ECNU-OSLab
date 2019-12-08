@@ -607,8 +607,8 @@
     {
         char *s, *ep;
 
-        if (addr < 0x2000 || (addr >= p->sz && addr < 
-        (USERTOP - p->stack_sz)) || addr >= USERTOP)
+        if (addr < 0x2000 || (addr >= p->sz && addr <  
+         (USERTOP - p->stack_sz)) || addr >= USERTOP)
             return -1;
 
         if (addr < p->sz) { // below sz
@@ -696,6 +696,7 @@
             return -1;
         }
         p->stack_sz = newstacksz;
+        switchuvm(p);
         return 0;
     }
 \end{ccode}
