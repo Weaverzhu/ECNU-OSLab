@@ -142,6 +142,7 @@ int growstack(int n, struct proc *p) {
     return -1;
   }
   p->stack_sz = newstacksz;
+  switchuvm(p);
   return 0;
 }
 // Create a new process copying p as the parent.

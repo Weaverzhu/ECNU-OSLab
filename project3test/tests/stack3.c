@@ -32,10 +32,13 @@ int main(int argc, char *argv[])
             *STACK = 'a';
             STACK -= 4096;
         }
-
+        // first grow the stack, then grow the heap, use malloc to grow the heap
         char *a = malloc(15 * 4096);
         assert(a != NULL);
         char *b = (void*)a-1;
+
+        // printf(1, "sz=%p, stack=%p\n", (uint)sbrk(0), STACK+4096);
+        assert(sbrk(0) + 0x5000 <= STACK + 4096);
 
         printf(1, "TEST PASSED\n");
         exit();

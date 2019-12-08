@@ -607,6 +607,10 @@
     {
         char *s, *ep;
 
+        if (addr < 0x2000 || (addr >= p->sz && addr < 
+        (USERTOP - p->stack_sz)) || addr >= USERTOP)
+            return -1;
+
         if (addr < p->sz) { // below sz
             if (addr < 0x2000) return -1;
             ep = (char*)p->sz;
@@ -746,10 +750,11 @@
 \begin{ccode}
     case T_PGFLT:
     {
-        uint loc = rcr2(), new_stack_sz;
-        cprintf("addr=%x\n", loc);
-        if (loc < 0x2000 || loc < proc->sz + 0x5000 || loc >= USERTOP) {
-            cprintf("we decide NOT to grow the stack!\n");
+        uint loc = rcr2(), new_stack_sz = USERTOP - (loc / PGSIZE * PGSIZE);;
+        // cprintf("addr=%x\n", loc);
+        if (loc < 0x2000 || loc < proc->sz + 0x5000 || 
+        loc >= USERTOP || growstack(new_stack_sz - proc->stack_sz, proc) == -1) {
+            // cprintf("we decide NOT to grow the stack!\n");
             cprintf("pid %d %s: trap %d err %d on cpu %d "
                 "eip 0x%x addr 0x%x--kill proc\n",
                 proc->pid, proc->name, tf->trapno, tf->err, cpu->id, tf->eip, 
@@ -757,10 +762,10 @@
             proc->killed = 1;
             break;
         }
-        new_stack_sz = USERTOP - (loc / PGSIZE * PGSIZE);
-        cprintf("grow the stack from %d to %d\n", proc->stack_sz, new_stack_sz);
-        growstack(new_stack_sz - proc->stack_sz, proc);  
+      // cprintf("grow the stack from %d to %d\n", proc->stack_sz, new_stack_sz);
+       
     }
+    break;
 \end{ccode}
 
 结果如图所示

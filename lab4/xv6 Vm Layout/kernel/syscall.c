@@ -41,6 +41,9 @@ int fetchstr(struct proc *p, uint addr, char **pp)
 {
   char *s, *ep;
 
+  if (addr < 0x2000 || (addr >= p->sz && addr < (USERTOP - p->stack_sz)) || addr >= USERTOP)
+    return -1;
+
   if (addr < p->sz)
   { // below sz
     if (addr < 0x2000)

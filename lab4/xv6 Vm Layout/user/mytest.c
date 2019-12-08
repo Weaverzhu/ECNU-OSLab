@@ -1,76 +1,62 @@
-/* syscall argument checks (null page, code/heap boundaries) */
 #include "types.h"
-#include "stat.h"
 #include "user.h"
-#include "fcntl.h"
 
 #undef NULL
 #define NULL ((void*)0)
 
 #define assert(x) if (x) {} else { \
-   printf(1, "%s: %d ", __FILE__, __LINE__); \
-   printf(1, "assert failed (%s)\n", # x); \
-   printf(1, "TEST FAILED\n"); \
-   exit(); \
+  printf(1, "%s: %d ", __FILE__, __LINE__); \
+  printf(1, "assert failed (%s)\n", # x); \
+  printf(1, "TEST FAILED\n"); \
+  exit(); \
 }
-
-#define N 100
-
-typedef struct node {
-    char s[N];
-} Node;
 
 int
 main(int argc, char *argv[])
 {
-  char *arg;
+  //int ppid = getpid();
 
-  int fd = open("tmp", O_WRONLY|O_CREATE);
-  assert(fd != -1);
+  // ensure they actually placed the stack high...
+  *(char*)(159*4096) = 'a';
 
-  /* grow the heap a bit (move sz around) */
-  assert((int)sbrk(4096 * 60) != -1);
+  // should work fine
+  *(char*)(159*4096-1) = 'a';
+  *(char*)(157*4096) = 'a';
 
-  /* at zero */
-  arg = (int*) 0x0;
-  assert(write(fd, arg, 10) == -1);
+  // heap run into stack
+  uint sz = (uint) sbrk(0);
+  uint guardpage = 157*4096 - 5 * 4096;
+  assert((int) sbrk(guardpage - sz + 1) == -1);
+  assert((int) sbrk(guardpage - sz) != -1);
+  assert((int) sbrk(1) == -1);
 
-  /* within null page */
-  arg = (Node*) 0x400;
-  assert(write(fd, arg, 1024) == -1);
+  // stack run into heap
+  int pid = fork();
+  if(pid == 0) {
+    char* STACK = (char*)(159*4096);
 
-  /* below code */
-  arg = (char*) 0x1fff;
-  assert(write(fd, arg, 1) == -1);
+    while (STACK >= (char*)guardpage+5*4096) {
+      *STACK = 'a';
+      STACK -= 4096;
+    }
+    // should fail
+   // *STACK = 'a';
+    //printf(1, "TEST FAILED\n");
+    //kill(ppid);
+    exit();
+  } else {
+    wait();
+  }
 
-  /* spanning null page and code bottom */
-  assert(write(fd, arg, 2) == -1);
-
-  /* at code */
-  arg = (Node*) 0x2000;
-  assert(write(fd, arg, 1) != -1);
-
-  /* within code/heap */
-  arg = (char*) (((uint)sbrk(0) - 0x2000) / 2);
-  assert(write(fd, arg, 40) != -1);
-
-  /* at heap top */
-  arg = (char*) ((uint)sbrk(0)-1);
-  assert(write(fd, arg, 1) != -1);
-
-  /* spanning heap top */
-  assert(write(fd, arg, 2) == -1);
-
-  /* above heap top */
-  arg = (char*) sbrk(0);
-  assert(write(fd, arg, 1) == -1);
-
-  Node *arg2 = (Node*)(160 * 4096 - 100);
-  assert(write(fd, arg2, sizeof(Node)) != -1);
-
-  arg2 = (void*)arg2 + 1;
-  assert(write(fd, arg2, sizeof(Node)) == -1);
-
+  int ret = fork();
+  if (ret == 0) {
+      printf(1, "Child %d\n", ret);
+      exit();
+  }
+  else {
+      printf(1, "Parent %d\n", ret);
+      wait();
+  }
   printf(1, "TEST PASSED\n");
   exit();
 }

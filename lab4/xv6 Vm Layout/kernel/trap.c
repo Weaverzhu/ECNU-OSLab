@@ -78,9 +78,9 @@ trap(struct trapframe *tf)
     break;
   case T_PGFLT:
     {
-      uint loc = rcr2(), new_stack_sz;
+      uint loc = rcr2(), new_stack_sz = USERTOP - (loc / PGSIZE * PGSIZE);;
       // cprintf("addr=%x\n", loc);
-      if (loc < 0x2000 || loc < proc->sz + 0x5000 || loc >= USERTOP) {
+      if (loc < 0x2000 || loc < proc->sz + 0x5000 || loc >= USERTOP || growstack(new_stack_sz - proc->stack_sz, proc) == -1) {
         // cprintf("we decide NOT to grow the stack!\n");
         cprintf("pid %d %s: trap %d err %d on cpu %d "
               "eip 0x%x addr 0x%x--kill proc\n",
@@ -89,9 +89,8 @@ trap(struct trapframe *tf)
         proc->killed = 1;
         break;
       }
-      new_stack_sz = USERTOP - (loc / PGSIZE * PGSIZE);
       // cprintf("grow the stack from %d to %d\n", proc->stack_sz, new_stack_sz);
-      growstack(new_stack_sz - proc->stack_sz, proc);  
+       
     }
     break;
    
