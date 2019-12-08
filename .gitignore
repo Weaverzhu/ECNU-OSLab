@@ -18,6 +18,7 @@ std
 *.pdf
 \savepoint
 \_minted-main
+initcode
 
 # xv6 binary
 mkfs
