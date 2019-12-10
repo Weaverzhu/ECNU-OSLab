@@ -130,8 +130,56 @@ The new thread starts executing at the address specified by fcn.
 As with fork(), the PID of the new thread is returned to the parent.
 */
 int
-clone(void) {
+clone(void(*fcn)(void*), void *arg, void *stack) {
+  int i, pid;
+  uint ustack[2];
+  struct proc *np;
 
+  // check if stack is page-aligned
+  if ((uint)stack % PGSIZE) return -1;
+
+  // Allocate process
+  if ((np = allocproc()) == 0)
+    return -1;
+
+  // share the address space
+  np->pgdir = proc->pgdir;
+
+  // fake pc
+  ustack[0] = 0xffffffff;
+
+  // pass arg
+  ustack[1] = arg;
+  np->tf->esp = stack + PGSIZE;
+  
+
+  // copy as in fork()
+  np->sz = proc->sz;
+  np->parent = proc;
+  *np->tf = *proc->tf;
+  
+  // make user stack
+  copyout(np->pgdir, np->tf->esp, ustack, sizeof(ustack));
+  np->thread_stack = stack;
+
+  // start executing at the address specified by fcn
+  np->tf->eip = fcn;
+  np->tf->ebp = np->tf->esp;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  // file descriptors are copied as in fork
+  for(i = 0; i < NOFILE; i++)
+    if(proc->ofile[i])
+      np->ofile[i] = filedup(proc->ofile[i]);
+  np->cwd = idup(proc->cwd);
+ 
+  pid = np->pid;
+  np->state = RUNNABLE;
+  safestrcpy(np->name, proc->name, sizeof(proc->name));
+  return pid;
+  
 }
 
 // Create a new process copying p as the parent.

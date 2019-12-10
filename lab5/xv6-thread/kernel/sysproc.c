@@ -8,7 +8,13 @@
 
 int
 sys_clone(void) {
-  return clone();
+  void (*fcn)(void*);
+  void *arg, *stack;
+  if (argptr(0, &fcn, sizeof(fcn)) < 0 ||
+  argptr(1, &arg, sizeof(arg)) ||
+  argptr(2, &stack, sizeof(stack)))
+    return -1;
+  return clone(fcn, arg, stack);
 }
 
 int
