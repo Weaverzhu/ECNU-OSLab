@@ -18,6 +18,14 @@ sys_clone(void) {
 }
 
 int
+sys_join(void) {
+  void **stack;
+  if (argptr(0, &stack, sizeof(stack) < 0))
+    return -1;
+  return join(stack);
+}
+
+int
 sys_fork(void)
 {
   return fork();
