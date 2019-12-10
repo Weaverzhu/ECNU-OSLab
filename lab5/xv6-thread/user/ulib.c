@@ -103,3 +103,21 @@ memmove(void *vdst, void *vsrc, int n)
     *dst++ = *src++;
   return vdst;
 }
+
+int
+thread_create(void (*start_routine)(void*), void *arg) 
+{
+  void *stack = malloc(4096);
+  if (stack == NULL) return -1;
+  int pid = clone(start_routine, arg, stack);
+  return pid;
+}
+
+int
+thread_join()
+{
+  void *stack;
+  if (join(&stack) < 0) return -1;
+  free(stack);
+  return 1;
+}

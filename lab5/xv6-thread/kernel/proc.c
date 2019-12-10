@@ -216,6 +216,9 @@ join(void **stack) {
         p->name[0] = 0;
         p->killed = 0;
         release(&ptable.lock);
+
+        // The location of the child's user stack is copied into the argument stack.
+        *stack = p->thread_stack;
         return pid;
       }
     }
