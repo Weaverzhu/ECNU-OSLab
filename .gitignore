@@ -22,7 +22,7 @@ initcode
 
 # xv6 binary
 mkfs
-kernel
+# kernel
 bootblock
 fs.img
 bootother
