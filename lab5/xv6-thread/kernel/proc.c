@@ -200,6 +200,8 @@ join(void **stack) {
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != proc)
         continue;
+      if (p->pgdir != proc)
+        continue;
       havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.
