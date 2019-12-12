@@ -26,7 +26,7 @@ mkfs
 bootblock
 fs.img
 bootother
-vector.S
+vectors.S
 xv6.img
 */kernel/kernel
 */kernel/vector.S

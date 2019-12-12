@@ -149,8 +149,8 @@ clone(void(*fcn)(void*), void *arg, void *stack) {
   ustack[0] = 0xffffffff;
 
   // pass arg
-  ustack[1] = arg;
-  np->tf->esp = stack + PGSIZE;
+  ustack[1] = (uint)arg;
+  np->tf->esp = (uint)stack + PGSIZE;
   
 
   // copy as in fork()
@@ -163,7 +163,7 @@ clone(void(*fcn)(void*), void *arg, void *stack) {
   np->thread_stack = stack;
 
   // start executing at the address specified by fcn
-  np->tf->eip = fcn;
+  np->tf->eip = (uint)fcn;
   np->tf->ebp = np->tf->esp;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -230,6 +230,7 @@ join(void **stack) {
     }
 
     sleep(proc, &ptable.lock);
+  }
 }
 
 // Create a new process copying p as the parent.
