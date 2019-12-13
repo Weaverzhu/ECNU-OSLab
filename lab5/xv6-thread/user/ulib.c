@@ -4,6 +4,29 @@
 #include "user.h"
 #include "x86.h"
 
+
+#define LOCK_ACQUIRED 1
+#define LOCK_FREE 0
+
+void spinlock_init(spinlock_t *lock)
+{
+    *lock = LOCK_FREE;
+}
+
+void spinlock_acquire(spinlock_t *lock)
+{
+    while (*lock || xchg(lock, LOCK_ACQUIRED))
+    {
+        asm("pause");
+    }
+}
+
+void spinlock_release(spinlock_t *lock)
+{
+    *lock = LOCK_FREE;
+}
+
+
 char*
 strcpy(char *s, char *t)
 {

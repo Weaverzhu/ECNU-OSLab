@@ -1,6 +1,15 @@
 #ifndef _USER_H_
 #define _USER_H_
 
+typedef struct __lock_t { int flag; } lock_t;
+
+typedef volatile unsigned int spinlock_t;
+
+void spinlock_init(spinlock_t *lock);
+void spinlock_acquire(spinlock_t *lock);
+void spinlock_release(spinlock_t *lock);
+
+
 struct stat;
 
 // system calls
