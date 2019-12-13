@@ -130,8 +130,22 @@ memmove(void *vdst, void *vsrc, int n)
 int
 thread_create(void (*start_routine)(void*), void *arg) 
 {
-  void *stack = malloc(4096);
+
+  // critical !!!
+  spinlock_t lock;
+  spinlock_init(&lock);
+  spinlock_acquire(&lock);
+
+  // because the stack is not guaranteed to be page aligned, we need
+  // more size to ensure it is
+  void *stack = malloc(4096 * 2);
+  spinlock_release(&lock);
+
   if (stack == NULL) return -1;
+
+  // page roundup, ensure stack is page aligned
+  stack = ((uint)stack + 4095) / 4096 * 4096;
+
   int pid = clone(start_routine, arg, stack);
   return pid;
 }
@@ -139,8 +153,14 @@ thread_create(void (*start_routine)(void*), void *arg)
 int
 thread_join()
 {
-  void *stack;
+  void *stack = malloc(sizeof(void*));
   if (join(&stack) < 0) return -1;
+
+  spinlock_t lock;
+  spinlock_init(&lock);
+  spinlock_acquire(&lock);
   free(stack);
-  return 1;
+  spinlock_release(&lock);
+
+  return 0;
 }
