@@ -1,2 +1,34 @@
 \subsection{Objectives}
 
+\begin{itemize}
+    \item 使 xv6 支持简单的 thread api
+    \item 实现两个系统调用 \texttt{int clone} 和 \texttt{int join}
+    \item 实现两个库函数 \texttt{thread\_create} 和 \texttt{thread\_join}
+\end{itemize}
+
+
+\subsection{Concept: something about x86}
+
+\subsection{Concept: CPU context}
+
+\subsection{Concept: calling function}
+
+这里简单概述一下 CPU 分时系统在 xv6 中的应用 
+
+\subsection{Concept: Thread \& Process}
+
+进程使操作系统虚拟化 CPU 的手段。在多程序同时运行的机器上，通过进程的实现使得每个程序都可以认为自己独占 CPU。
+
+进程的信息被存放在 TCB (Thread Control Block) 中，而线程的信息被存放在 PCB 中 （Process Control Block)。但是，进程和线程有很类似的地方，他们都需要在调度器中被存储下关于上下文的东西，比如堆栈指针，一些寄存器的值，打开的文件（设备），上下文和运行状态等。
+
+如果我们特意地去实现 TCB 和 PCB 并把它们区分开来，那么我们需要在 schedule 中耗费大量的精力。事实上进程和线程主要地区别在于派生出来的线程需要有额外自己的 stack frame，和父进程拥有相同的内存管理（page directory），有和父进程不一样的 pc。
+
+所以这里我们用到的 trick 就是让 scheduler 认为进程和线程大抵是一样的东西（共用数据结构 \texttt{struct proc}）,修改结果加上线程自己的栈空间 \texttt{void *thread\_stack} 然后指定 \texttt{eip, esp} 来规定 \texttt{start\_routine} 和自己的栈空间
+
+\subsection{Code: clone \& join}
+
+\subsection{Code: thread\_create \& thread\_join}
+
+\subsubsection{why we should use lock}
+
+\subsection{Test our thread api}
