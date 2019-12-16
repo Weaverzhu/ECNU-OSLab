@@ -34,7 +34,6 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-
 int clone(void(*fcn)(void*), void *arg, void *stack);
 int join(void **stack);
 

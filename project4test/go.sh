@@ -1,0 +1,1 @@
+python project4b.py -p ../lab5/xv6-thread
