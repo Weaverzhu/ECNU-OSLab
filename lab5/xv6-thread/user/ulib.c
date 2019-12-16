@@ -152,6 +152,7 @@ thread_create(void (*start_routine)(void*), void *arg)
   stack = ((uint)stack + 4095) / 4096 * 4096;
   printf(1, "thread_stack: %p, %p\n", stack, stack + 4096);
   int pid = clone(start_routine, arg, stack);
+  printf(1, "in father proc: pid=%d\n", pid);
   return pid;
 }
 

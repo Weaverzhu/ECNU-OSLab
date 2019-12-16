@@ -135,6 +135,7 @@ growproc(int n)
   }
 
   // proc->sz = sz;
+  release(&ptable.lock);
   switchuvm(proc);
   return 0;
 }
@@ -238,7 +239,8 @@ clone(void(*fcn)(void*), void *arg, void *stack) {
   pid = np->pid;
   np->state = RUNNABLE;
   safestrcpy(np->name, proc->name, sizeof(proc->name));
-  cprintf("dbg: clone completed!, pid=%d\n", pid);
+  // cprintf("dbg: clone completed!, pid=%d, np->tf->eip=%p\n", pid, np->tf->eip);
+  // procdump();
   return pid;
   
 }
