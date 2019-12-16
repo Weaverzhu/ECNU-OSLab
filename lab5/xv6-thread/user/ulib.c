@@ -160,7 +160,8 @@ int
 thread_join()
 {
   void *stack = malloc(sizeof(void*));
-  if (join(&stack) < 0) return -1;
+  int pid;
+  if ((pid = join(&stack)) < 0) return -1;
 
   spinlock_t lock;
   spinlock_init(&lock);
@@ -168,5 +169,5 @@ thread_join()
   free(stack);
   spinlock_release(&lock);
 
-  return 0;
+  return pid;
 }

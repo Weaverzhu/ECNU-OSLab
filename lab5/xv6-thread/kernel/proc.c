@@ -270,7 +270,7 @@ join(void **stack) {
       havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.
-        pid = p->pid;
+        pid = p->pid; cprintf("Found child thread, pid=%d\n", pid);
         kfree(p->kstack);
         p->kstack = 0;
 
