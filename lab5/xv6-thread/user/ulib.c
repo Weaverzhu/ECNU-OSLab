@@ -150,17 +150,17 @@ thread_create(void (*start_routine)(void*), void *arg)
   return pid;
 }
 
-// int
-// thread_join()
-// {
-//   void *stack = malloc(sizeof(void*));
-//   if (join(&stack) < 0) return -1;
+int
+thread_join()
+{
+  void *stack = malloc(sizeof(void*));
+  if (join(&stack) < 0) return -1;
 
-//   spinlock_t lock;
-//   spinlock_init(&lock);
-//   spinlock_acquire(&lock);
-//   free(stack);
-//   spinlock_release(&lock);
+  spinlock_t lock;
+  spinlock_init(&lock);
+  spinlock_acquire(&lock);
+  free(stack);
+  spinlock_release(&lock);
 
-//   return 0;
-// }
+  return 0;
+}
