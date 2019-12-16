@@ -261,7 +261,7 @@ join(void **stack) {
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != proc)
         continue;
-      if (p->pgdir != proc)
+      if (p->pgdir != proc->pgdir)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -327,9 +327,16 @@ exit(void)
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == proc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
+      if (p->pgdir != proc->pgdir) {
+        // transfer parent attr to initproc
+        p->parent = initproc;
+        if(p->state == ZOMBIE)
+          wakeup1(initproc);
+      } else {
+        // kill all the threads!
+        p->parent = 0;
+        p->state = ZOMBIE;
+      }
     }
   }
 
@@ -353,6 +360,9 @@ wait(void)
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != proc)
+        continue;
+      // we do not clear threads!!!
+      if (p->pgdir == proc->pgdir)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
