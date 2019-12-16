@@ -204,6 +204,11 @@ clone(void(*fcn)(void*), void *arg, void *stack) {
   // share the address space
   np->pgdir = proc->pgdir;
 
+  // copy as in fork()
+  np->sz = proc->sz;
+  np->parent = proc;
+  *np->tf = *proc->tf;
+
   // fake pc
   ustack[0] = 0xffffffff;
 
@@ -212,10 +217,7 @@ clone(void(*fcn)(void*), void *arg, void *stack) {
   np->tf->esp = (uint)stack + PGSIZE- sizeof(ustack);
   
 
-  // copy as in fork()
-  np->sz = proc->sz;
-  np->parent = proc;
-  *np->tf = *proc->tf;
+  
   
   // make user stack
   copyout(np->pgdir, np->tf->esp, ustack, sizeof(ustack));
