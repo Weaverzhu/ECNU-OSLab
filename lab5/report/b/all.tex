@@ -6,16 +6,59 @@
     \item 实现两个库函数 \texttt{thread\_create} 和 \texttt{thread\_join}
 \end{itemize}
 
+\subsection{Steps}
+
+我们实现的线程 \texttt{clone, join} 相当于进程中的 \texttt{fork, wait}，并且
+
 
 \subsection{Concept: something about x86}
 
+回顾一下 x86 一些寄存器的用途
+
+\subsubsection{通用寄存器 (GPR)}
+
+\noindent
+\begin{tabularx}{\textwidth}{|X|X|X|X|X|X|X|X|X|}
+    \hline
+    Register & Accumu-lator  &Base &Stack Pointer & Stack Base Pointer & Source & Desti-nation \\ \hline
+    64-bit & RAX & RBX & RSP & RBP & RSI & RDI \\ \hline
+    32-bit & EAX & EBX & ESP & EBP & ESI & EDI \\ \hline
+    16-bit & AX & BX & SP & BP & SI & DI \\ \hline
+\end{tabularx}
+
+\subsubsection{指令寄存器 (IP)}
+
+EIP 会指向下一个需要被执行的指令，如果没有分支的话。EIP 只有在 \texttt{call} 指令之后才会在堆栈上被读取
+
 \subsection{Concept: CPU context}
+
+一篇讲的不错的文章: 
+https://samwho.dev/blog/2013/06/01/context-switching-on-x86/
+
+回顾一下系统调用时上下文信息会存放在 trap frame 当中，在系统调用之后返回继续执行的时候会用这些信息重新组成上下文。所以我们如果要指定新的线程会进程（不管是在 \texttt{fork} 中还是 \texttt{clone} 中都需要设置 \texttt{proc->tf}）
+
+CPU 进行上下文切换的时候只会保留需要保留的状态，实现的方法是保存堆栈指针（stack pointer), 并且使用一个新的。当一个函数被调用的时候，EIP 也就是指令寄存器会指向下一条指令被存放的位置。如果我们需要开始执行 \texttt{start\_routine} 的话，就要把它赋值为函数指针所指向的地址
 
 \subsection{Concept: calling function}
 
-这里简单概述一下 CPU 分时系统在 xv6 中的应用 
+stack 从地址高位开始向地位扩展，其中 ebp 在高位界限，esp 在低位界限。存入栈的机制是，从高到低移动 esp 并在新的 esp 位置开始放入数据
 
-\subsection{Concept: Thread \& Process}
+c 语言默认使用 CDECL 调用方法，有如下特性
+
+\begin{itemize}
+    \item 如上所述参数从高位到地位放置
+    \item 调用参数的函数会清理栈空间
+\end{itemize}
+
+\texttt{clone} 函数要求创建线程并直接开始运行 \texttt{start\_routine}，观察 x86 如何调用进程：
+
+\begin{asmcode}
+    push eip + 2 ; return address is current address + size of two instructions
+    jmp _MyFunction2
+\end{asmcode}
+
+
+\subsection{Concept: Thread \&  Process}
 
 进程使操作系统虚拟化 CPU 的手段。在多程序同时运行的机器上，通过进程的实现使得每个程序都可以认为自己独占 CPU。
 
@@ -26,6 +69,8 @@
 所以这里我们用到的 trick 就是让 scheduler 认为进程和线程大抵是一样的东西（共用数据结构 \texttt{struct proc}）,修改结果加上线程自己的栈空间 \texttt{void *thread\_stack} 然后指定 \texttt{eip, esp} 来规定 \texttt{start\_routine} 和自己的栈空间
 
 \subsection{Code: clone \& join}
+
+
 
 \subsection{Code: thread\_create \& thread\_join}
 
