@@ -2,13 +2,22 @@
 
 \begin{itemize}
     \item 使 xv6 支持简单的 thread api
-    \item 实现两个系统调用 \texttt{int clone} 和 \texttt{int join}
-    \item 实现两个库函数 \texttt{thread\_create} 和 \texttt{thread\_join}
+    \item 仿照 pthread 实现基本线程操作
+    \item 实现两个系统调用 \texttt{int clone} 和 \texttt{int join}，\texttt{clone} 会指定一个函数，及其参数和新线程应有的 \texttt{stack} 空间，然后 \texttt{clone} 为其创建线程，将控制流指向函数，然后放入调度器。\texttt{join} 会等待一个子线程结束运行并且返回得到该线程的栈，用以回收资源
+    \item 实现两个库函数 \texttt{thread\_create} 和 \texttt{thread\_join}，供用户使用
 \end{itemize}
 
 \subsection{Steps}
 
-我们实现的线程 \texttt{clone, join} 相当于进程中的 \texttt{fork, wait}，并且
+\begin{itemize}
+    \item 我们实现的线程 \texttt{clone, join} 相当于进程中的 \texttt{fork, wait}。
+    \item 线程有自己栈，但是共享内存空间和打开的设备和文件
+    \item 创建线程和等待线程结束回收资源与 \texttt{fork, wait} 的区别主要在于需要对线程的栈进行操作
+    \item 为线程栈分配空间的时候应该使用 \texttt{lock} 从而避免同时进入线程不安全的 \texttt{malloc}
+\end{itemize}
+
+
+
 
 
 \subsection{Concept: something about x86}
@@ -32,30 +41,80 @@ EIP 会指向下一个需要被执行的指令，如果没有分支的话。EIP 
 
 \subsection{Concept: CPU context}
 
-一篇讲的不错的文章: 
-https://samwho.dev/blog/2013/06/01/context-switching-on-x86/
-
 回顾一下系统调用时上下文信息会存放在 trap frame 当中，在系统调用之后返回继续执行的时候会用这些信息重新组成上下文。所以我们如果要指定新的线程会进程（不管是在 \texttt{fork} 中还是 \texttt{clone} 中都需要设置 \texttt{proc->tf}）
 
 CPU 进行上下文切换的时候只会保留需要保留的状态，实现的方法是保存堆栈指针（stack pointer), 并且使用一个新的。当一个函数被调用的时候，EIP 也就是指令寄存器会指向下一条指令被存放的位置。如果我们需要开始执行 \texttt{start\_routine} 的话，就要把它赋值为函数指针所指向的地址
 
 \subsection{Concept: calling function}
 
-stack 从地址高位开始向地位扩展，其中 ebp 在高位界限，esp 在低位界限。存入栈的机制是，从高到低移动 esp 并在新的 esp 位置开始放入数据
+x86 中 栈 (stack) 从地址高位开始向地位扩展，其中 ebp 在高位界限，esp 在低位界限。存入栈的机制是，从高到低移动 esp 并在新的 esp 位置开始放入数据
 
-c 语言默认使用 CDECL 调用方法，有如下特性
+x86 执行一个函数的步骤如下：
 
-\begin{itemize}
-    \item 如上所述参数从高位到地位放置
-    \item 调用参数的函数会清理栈空间
-\end{itemize}
+在调用函数的地方：
 
-\texttt{clone} 函数要求创建线程并直接开始运行 \texttt{start\_routine}，观察 x86 如何调用进程：
+\begin{enumerate}
+    \item 反序将所有函数参数压入栈中
+    \item 执行 \texttt{call} 指令，会把当前下一条指令压入栈中，然后修改 \texttt{eip} 的值，指向函数的第一条指令
+\end{enumerate}
+
+于是整个栈空间会变得像这样：
+
+\begin{textcode}
+    Parameter #N
+    ...
+    Parameter 2
+    Parameter 1
+    Return Address <--- (%esp)
+\end{textcode}
+
+
+在函数里面也有一些事情要做：
+
+\begin{enumerate}
+    \item 保存现在的 \texttt{ebp}，并将其赋值给 \texttt{esp}，这个过程相当于初始化一个栈空间给当前函数
+\end{enumerate}
+
+现在，ebp 往上是函数的参数，ebp往下就是函数自己的栈空间了
+
+这个时候栈空间的样子：
+
+\begin{textcode}
+    Parameter #N <--- N*4+4(%ebp)
+    ...
+    Parameter 2 <--- 12(%ebp)
+    Parameter 1 <--- 8(%ebp)
+    Return Address <--- 4(%ebp)
+    Old %ebp <--- (%esp) and (%ebp)
+\end{textcode}
 
 \begin{asmcode}
-    push eip + 2 ; return address is current address + size of two instructions
-    jmp _MyFunction2
+    subl $8, %esp
 \end{asmcode}
+
+之后函数将会给里面的本地变量预留出内存空间，方法就是扩大栈空间，将 \texttt{esp} 向低位移动。如果有两个参数的话那么栈空间是长成这个样子的:
+
+
+\begin{textcode}
+    Parameter #N <--- N*4+4(%ebp)
+    ...
+    Parameter 2 <--- 12(%ebp)
+    Parameter 1 <--- 8(%ebp)
+    Return Address <--- 4(%ebp)
+    Old %ebp <--- (%ebp)
+    Local Variable 1 <--- -4(%ebp)
+    Local Variable 2 <--- -8(%ebp) and (%esp)
+\end{textcode}
+
+当函数返回的时候：
+
+\begin{enumerate}
+    \item 返回值存放在 \texttt{eax}
+    \item 将栈回滚到调用这个函数的时候，也就是将 \texttt{ebp, esp} 重置为调用函数之前的值
+    \item 使用 \texttt{ret} 指令将控制流送回，也就是将栈中存放的之前那个下一条指令的值放回 \texttt{eip}
+\end{enumerate}
+
+在 \texttt{clone} 中我们需要直接开始执行 \texttt{start\_routine} 函数，因此要由我们在 \texttt{clone} 系统调用中做好调用函数的工作
 
 
 \subsection{Concept: Thread \&  Process}

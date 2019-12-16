@@ -28,8 +28,7 @@ fs.img
 bootother
 vectors.S
 xv6.img
-*/kernel/kernel
-*/kernel/vector.S
+
 
 
 # Byte-compiled / optimized / DLL files
