@@ -103,20 +103,38 @@ userinit(void)
 
 // Grow current process's memory by n bytes.
 // Return 0 on success, -1 on failure.
+// should update all threads' size!
 int
 growproc(int n)
 {
   uint sz;
-  
+  struct proc *p;
+
+  acquire(&ptable.lock);
+
   sz = proc->sz;
   if(n > 0){
-    if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0)
+    if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0) {
+      release(&ptable.lock);
       return -1;
+    }
+      
   } else if(n < 0){
-    if((sz = deallocuvm(proc->pgdir, sz, sz + n)) == 0)
+    if((sz = deallocuvm(proc->pgdir, sz, sz + n)) == 0) {
+      release(&ptable.lock);
       return -1;
+    }
+      
   }
-  proc->sz = sz;
+
+  // will update all the threads which are belong to proc
+  for (p=ptable.proc; p<&ptable.proc[NPROC]; ++p) {
+    if (p->pgdir == proc->pgdir) {
+      p->sz = sz;
+    }
+  }
+
+  // proc->sz = sz;
   switchuvm(proc);
   return 0;
 }
