@@ -257,6 +257,10 @@ join(void **stack) {
   struct proc *p;
   int havekids, pid;
 
+  // stack should be in proc, which is allocated by malloc
+  if ((proc->sz - (uint)stack) < sizeof(void**))
+    return -1;
+
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for zombie children.
