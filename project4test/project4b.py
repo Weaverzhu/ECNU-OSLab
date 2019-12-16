@@ -10,9 +10,9 @@ class Test0(Xv6Test):
    point_value = 10
    make_qemu_args = "CPUS=1"
 
-class UserTest(Xv6Test):
-   name = "usertests"
-   description = """usertests"""
+class TestBase(Xv6Test):
+   name = "base"
+   description = """base"""
    tester = name + ".c"
    timeout = 30
    point_value = 10
@@ -28,16 +28,16 @@ class UserTest(Xv6Test):
 class myTest(Xv6Test):
    def __init__(self, testname, cpunum=1):
       # super().__init__()
-      self.name = testname
-      self.descrption = testname
-      self.tester = self.name + ".c"
-      self.timeout = 30
-      self.point_value = 10
-      self.make_qemu_args = "CPUS={}".format(cpunum)
+      name = testname
+      descrption = testname
+      tester = name + ".c"
+      timeout = 30
+      point_value = 10
+      make_qemu_args = "CPUS={}".format(cpunum)
 
 test1 = myTest("usertests")
 
-all_test = [test1]
+all_test = [TestBase]
 
 
 main(Xv6Build, all_test)

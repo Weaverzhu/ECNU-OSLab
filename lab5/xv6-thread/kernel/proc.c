@@ -121,6 +121,46 @@ growproc(int n)
   return 0;
 }
 
+
+// Create a new process copying p as the parent.
+// Sets up stack to return as if from system call.
+// Caller must set state of returned proc to RUNNABLE.
+int
+fork(void)
+{
+  int i, pid;
+  struct proc *np;
+
+  // Allocate process.
+  if((np = allocproc()) == 0)
+    return -1;
+
+  // Copy process state from p.
+  if((np->pgdir = copyuvm(proc->pgdir, proc->sz)) == 0){
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state = UNUSED;
+    return -1;
+  }
+  np->sz = proc->sz;
+  np->parent = proc;
+  *np->tf = *proc->tf;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  for(i = 0; i < NOFILE; i++)
+    if(proc->ofile[i])
+      np->ofile[i] = filedup(proc->ofile[i]);
+  np->cwd = idup(proc->cwd);
+ 
+  pid = np->pid;
+  np->state = RUNNABLE;
+  safestrcpy(np->name, proc->name, sizeof(proc->name));
+  return pid;
+}
+
+
 /*
 creates a new kernel thread which shares the calling process's address space. 
 File descriptors are copied as in fork. The new process uses stack as its user stack, w
@@ -148,9 +188,9 @@ clone(void(*fcn)(void*), void *arg, void *stack) {
   // fake pc
   ustack[0] = 0xffffffff;
 
-  // pass arg
+  // pass arg, args should be just above esp
   ustack[1] = (uint)arg;
-  np->tf->esp = (uint)stack + PGSIZE;
+  np->tf->esp = (uint)stack + PGSIZE- sizeof(ustack);
   
 
   // copy as in fork()
@@ -164,6 +204,8 @@ clone(void(*fcn)(void*), void *arg, void *stack) {
 
   // start executing at the address specified by fcn
   np->tf->eip = (uint)fcn;
+
+  // clearing stack for fcn
   np->tf->ebp = np->tf->esp;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -178,6 +220,7 @@ clone(void(*fcn)(void*), void *arg, void *stack) {
   pid = np->pid;
   np->state = RUNNABLE;
   safestrcpy(np->name, proc->name, sizeof(proc->name));
+  cprintf("dbg: clone completed!, pid=%d\n", pid);
   return pid;
   
 }
@@ -233,44 +276,6 @@ join(void **stack) {
 
     sleep(proc, &ptable.lock);
   }
-}
-
-// Create a new process copying p as the parent.
-// Sets up stack to return as if from system call.
-// Caller must set state of returned proc to RUNNABLE.
-int
-fork(void)
-{
-  int i, pid;
-  struct proc *np;
-
-  // Allocate process.
-  if((np = allocproc()) == 0)
-    return -1;
-
-  // Copy process state from p.
-  if((np->pgdir = copyuvm(proc->pgdir, proc->sz)) == 0){
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->state = UNUSED;
-    return -1;
-  }
-  np->sz = proc->sz;
-  np->parent = proc;
-  *np->tf = *proc->tf;
-
-  // Clear %eax so that fork returns 0 in the child.
-  np->tf->eax = 0;
-
-  for(i = 0; i < NOFILE; i++)
-    if(proc->ofile[i])
-      np->ofile[i] = filedup(proc->ofile[i]);
-  np->cwd = idup(proc->cwd);
- 
-  pid = np->pid;
-  np->state = RUNNABLE;
-  safestrcpy(np->name, proc->name, sizeof(proc->name));
-  return pid;
 }
 
 // Exit the current process.  Does not return.

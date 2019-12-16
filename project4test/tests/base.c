@@ -4,22 +4,21 @@
 #include "fs.h"
 
 volatile uint shared=0;
-spinlock_t* lk;
+lock_t* lk;
 struct add {
 	int a;
 	int b;
 };
-void test(int a, int b){
-  printf(1, "hello here is in function test!\n");
+void test(void* ab){
 	int i;
-	spinlock_acquire(lk);
+	lock_acquire(lk);
 	int temp;
 	for(i=0;i<4000000;i++){
 		temp = shared;
 		temp = temp+1;
 		shared=temp;
 	}
-	spinlock_release(lk);
+	lock_release(lk);
 	printf(1,"calling exit");
 	exit();
 }
@@ -27,8 +26,7 @@ void test(int a, int b){
 int
 main(int argc, char *argv[])
 {
-	spinlock_init(lk);
-  printf(1, "after lock init\n");
+	lock_init(lk);
 //	void* m1;
 //	m1 = malloc(4096);
 //	unsigned char *p = (unsigned char *)&test;
