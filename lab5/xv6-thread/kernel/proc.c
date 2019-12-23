@@ -342,7 +342,7 @@ exit(void)
           wakeup1(initproc);
       } else {
         // kill all the threads!
-        p->parent = 0;
+        
         p->state = ZOMBIE;
       }
     }
@@ -353,6 +353,8 @@ exit(void)
   sched();
   panic("zombie exit");
 }
+
+// int countAddressSpaceReference(pde_t *)
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.

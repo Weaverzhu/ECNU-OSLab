@@ -1,19 +1,19 @@
 \subsection{Objectives}
 
 \begin{itemize}
-    \item 使 xv6 支持简单的 thread api
-    \item 仿照 pthread 实现基本线程操作
-    \item 实现两个系统调用 \texttt{int clone} 和 \texttt{int join}，\texttt{clone} 会指定一个函数，及其参数和新线程应有的 \texttt{stack} 空间，然后 \texttt{clone} 为其创建线程，将控制流指向函数，然后放入调度器。\texttt{join} 会等待一个子线程结束运行并且返回得到该线程的栈，用以回收资源
-    \item 实现两个库函数 \texttt{thread\_create} 和 \texttt{thread\_join}，供用户使用
+	\item 使 xv6 支持简单的 thread api
+	\item 仿照 pthread 实现基本线程操作
+	\item 实现两个系统调用 \texttt{int clone} 和 \texttt{int join}，\texttt{clone} 会指定一个函数，及其参数和新线程应有的 \texttt{stack} 空间，然后 \texttt{clone} 为其创建线程，将控制流指向函数，然后放入调度器。\texttt{join} 会等待一个子线程结束运行并且返回得到该线程的栈，用以回收资源
+	\item 实现两个库函数 \texttt{thread\_create} 和 \texttt{thread\_join}，供用户使用
 \end{itemize}
 
 \subsection{Steps}
 
 \begin{itemize}
-    \item 我们实现的线程 \texttt{clone, join} 相当于进程中的 \texttt{fork, wait}。
-    \item 线程有自己栈，但是共享内存空间和打开的设备和文件
-    \item 创建线程和等待线程结束回收资源与 \texttt{fork, wait} 的区别主要在于需要对线程的栈进行操作
-    \item 为线程栈分配空间的时候应该使用 \texttt{lock} 从而避免同时进入线程不安全的 \texttt{malloc}
+	\item 我们实现的线程 \texttt{clone, join} 相当于进程中的 \texttt{fork, wait}。
+	\item 线程有自己栈，但是共享内存空间和打开的设备和文件
+	\item 创建线程和等待线程结束回收资源与 \texttt{fork, wait} 的区别主要在于需要对线程的栈进行操作
+	\item 为线程栈分配空间的时候应该使用 \texttt{lock} 从而避免同时进入线程不安全的 \texttt{malloc}
 \end{itemize}
 
 
@@ -28,11 +28,11 @@
 
 \noindent
 \begin{tabularx}{\textwidth}{|X|X|X|X|X|X|X|X|X|}
-    \hline
-    Register & Accumu-lator  &Base &Stack Pointer & Stack Base Pointer & Source & Desti-nation \\ \hline
-    64-bit & RAX & RBX & RSP & RBP & RSI & RDI \\ \hline
-    32-bit & EAX & EBX & ESP & EBP & ESI & EDI \\ \hline
-    16-bit & AX & BX & SP & BP & SI & DI \\ \hline
+	\hline
+	Register & Accumu-lator & Base & Stack Pointer & Stack Base Pointer & Source & Desti-nation \\ \hline
+	64-bit   & RAX          & RBX  & RSP           & RBP                & RSI    & RDI          \\ \hline
+	32-bit   & EAX          & EBX  & ESP           & EBP                & ESI    & EDI          \\ \hline
+	16-bit   & AX           & BX   & SP            & BP                 & SI     & DI           \\ \hline
 \end{tabularx}
 
 \subsubsection{指令寄存器 (IP)}
@@ -54,25 +54,25 @@ x86 执行一个函数的步骤如下：
 在调用函数的地方：
 
 \begin{enumerate}
-    \item 反序将所有函数参数压入栈中
-    \item 执行 \texttt{call} 指令，会把当前下一条指令压入栈中，然后修改 \texttt{eip} 的值，指向函数的第一条指令
+	\item 反序将所有函数参数压入栈中
+	\item 执行 \texttt{call} 指令，会把当前下一条指令压入栈中，然后修改 \texttt{eip} 的值，指向函数的第一条指令
 \end{enumerate}
 
 于是整个栈空间会变得像这样：
 
 \begin{textcode}
-    Parameter #N
-    ...
-    Parameter 2
-    Parameter 1
-    Return Address <--- (%esp)
+	Parameter #N
+	...
+	Parameter 2
+	Parameter 1
+	Return Address <--- (%esp)
 \end{textcode}
 
 
 在函数里面也有一些事情要做：
 
 \begin{enumerate}
-    \item 保存现在的 \texttt{ebp}，并将其赋值给 \texttt{esp}，这个过程相当于初始化一个栈空间给当前函数
+	\item 保存现在的 \texttt{ebp}，并将其赋值给 \texttt{esp}，这个过程相当于初始化一个栈空间给当前函数
 \end{enumerate}
 
 现在，ebp 往上是函数的参数，ebp往下就是函数自己的栈空间了
@@ -80,41 +80,43 @@ x86 执行一个函数的步骤如下：
 这个时候栈空间的样子：
 
 \begin{textcode}
-    Parameter #N <--- N*4+4(%ebp)
-    ...
-    Parameter 2 <--- 12(%ebp)
-    Parameter 1 <--- 8(%ebp)
-    Return Address <--- 4(%ebp)
-    Old %ebp <--- (%esp) and (%ebp)
+	Parameter #N <--- N*4+4(%ebp)
+	...
+	Parameter 2 <--- 12(%ebp)
+	Parameter 1 <--- 8(%ebp)
+	Return Address <--- 4(%ebp)
+	Old %ebp <--- (%esp) and (%ebp)
 \end{textcode}
 
 \begin{asmcode}
-    subl $8, %esp
+	subl $8, %esp
 \end{asmcode}
 
 之后函数将会给里面的本地变量预留出内存空间，方法就是扩大栈空间，将 \texttt{esp} 向低位移动。如果有两个参数的话那么栈空间是长成这个样子的:
 
 
 \begin{textcode}
-    Parameter #N <--- N*4+4(%ebp)
-    ...
-    Parameter 2 <--- 12(%ebp)
-    Parameter 1 <--- 8(%ebp)
-    Return Address <--- 4(%ebp)
-    Old %ebp <--- (%ebp)
-    Local Variable 1 <--- -4(%ebp)
-    Local Variable 2 <--- -8(%ebp) and (%esp)
+	Parameter #N <--- N*4+4(%ebp)
+	...
+	Parameter 2 <--- 12(%ebp)
+	Parameter 1 <--- 8(%ebp)
+	Return Address <--- 4(%ebp)
+	Old %ebp <--- (%ebp)
+	Local Variable 1 <--- -4(%ebp)
+	Local Variable 2 <--- -8(%ebp) and (%esp)
 \end{textcode}
 
 当函数返回的时候：
 
 \begin{enumerate}
-    \item 返回值存放在 \texttt{eax}
-    \item 将栈回滚到调用这个函数的时候，也就是将 \texttt{ebp, esp} 重置为调用函数之前的值
-    \item 使用 \texttt{ret} 指令将控制流送回，也就是将栈中存放的之前那个下一条指令的值放回 \texttt{eip}
+	\item 返回值存放在 \texttt{eax}
+	\item 将栈回滚到调用这个函数的时候，也就是将 \texttt{ebp, esp} 重置为调用函数之前的值
+	\item 使用 \texttt{ret} 指令将控制流送回，也就是将栈中存放的之前那个下一条指令的值放回 \texttt{eip}
 \end{enumerate}
 
 在 \texttt{clone} 中我们需要直接开始执行 \texttt{start\_routine} 函数，因此要由我们在 \texttt{clone} 系统调用中做好调用函数的工作
+
+这里实现的要求是在新建的 thread 中压入 fake pc，也就是执行到 \texttt{exit} 位置，那么这样我们就需要在 \texttt{start_routine} 中执行 \texttt{exit} 否则就会一直执行直到 \texttt{0xffffffff} 为止
 
 
 \subsection{Concept: Thread \&  Process}
@@ -127,14 +129,203 @@ x86 执行一个函数的步骤如下：
 
 所以这里我们用到的 trick 就是让 scheduler 认为进程和线程大抵是一样的东西（共用数据结构 \texttt{struct proc}）,修改结果加上线程自己的栈空间 \texttt{void *thread\_stack} 然后指定 \texttt{eip, esp} 来规定 \texttt{start\_routine} 和自己的栈空间
 
+\subsection{Concept: Thread-safty}
+
+函数的线程安全的含义差不多就是，多个线程同时执行这个函数（可能会包含共享资源）会不会发生错误。留意 \texttt{malloc, free} 当中会对 \texttt{freelist} 这一链表进行读写操作。如果我们什么都不做的话，显然不是线程安全的。我们直到对于一个共享链表，我们可以通过 \texttt{read-write lock}，对于每一个节点或者对整个链表加锁的方式使得多个线程能共享同一个链表。对整个链表加锁无疑是最方便的方法，虽然执行效率也是最低的（最 coarse-grained 的处理方式）
+
+% TODO: 
+
 \subsection{Code: clone \& join}
 
-\texttt{clone} 就是模仿 \texttt{fork} 制造一个“假进程”
 
 
+
+
+\subsubsection{clone}
+
+\texttt{clone} 就是模仿 \texttt{fork} 制造一个假进程。相比 \texttt{fork} 中需要复制 \texttt{page table}，\texttt{clone} 需要将自己的页表指针指向同一个页表。
+
+\begin{ccode}
+	int i, pid;
+	uint ustack[2];
+	struct proc *np;
+			
+	// check if stack is page-aligned
+	if ((uint)stack % PGSIZE) return -1;
+			
+	// Allocate process
+	if ((np = allocproc()) == 0)
+	return -1;
+			
+	// share the address space
+	np->pgdir = proc->pgdir;
+			
+	// copy as in fork()
+	np->sz = proc->sz;
+	np->parent = proc;
+	*np->tf = *proc->tf;
+			
+	// fake pc
+	ustack[0] = 0xffffffff;
+			
+\end{ccode}
+
+设置 \texttt{esp, ebp} 到指定的用户栈可以初始化线程的栈空间
+
+\begin{ccode}
+	// pass arg, args should be just above esp
+	ustack[1] = (uint)arg;
+	np->tf->esp = (uint)stack + PGSIZE- sizeof(ustack);
+	// make user stack
+	copyout(np->pgdir, np->tf->esp, ustack, sizeof(ustack));
+	np->thread_stack = stack;
+		  
+	// start executing at the address specified by fcn
+	np->tf->eip = (uint)fcn;
+		  
+	// clearing stack for fcn
+	np->tf->ebp = np->tf->esp;
+		  
+	// Clear %eax so that fork returns 0 in the child.
+	np->tf->eax = 0;
+\end{ccode}
+
+\texttt{file descriptor, proc->state} 等同样参照 \texttt{fork}
+
+\begin{ccode}
+	// file descriptors are copied as in fork
+	for(i = 0; i < NOFILE; i++)
+	if(proc->ofile[i])
+	np->ofile[i] = filedup(proc->ofile[i]);
+	np->cwd = idup(proc->cwd);
+		   
+	pid = np->pid;
+	np->state = RUNNABLE;
+	safestrcpy(np->name, proc->name, sizeof(proc->name));
+	// cprintf("dbg: clone completed!, pid=%d, np->tf->eip=%p\n", pid, np->tf->eip);
+	// procdump();
+	return pid;
+\end{ccode}
+
+\subsubsection{wait & join}
+
+\texttt{join} 也要仿照 \texttt{wait}，遍历进程表中的每一个进程，找到对应的父子关系的子进程或者子线程。如果它是 \texttt{ZOMBIE} 状态，则回收栈空间资源。由于是用户空间传来的栈空间，这里我们需要将栈空间指针传回去
+
+\texttt{wait, join} 是两个完全不同的行为，一个是等待子进程，一个是等待子线程。我们可以通过子进程线程的页表是否和父亲的相同判断它是一个线程还是一个进程
+
+在 \texttt{wait} 当中我们需要添加
+
+\begin{ccode}
+	// we do not clear threads!!!
+	if (p->pgdir == proc->pgdir)
+	continue;
+\end{ccode}
+
+在 \texttt{join} 中我们也需要排除是子进程的情况
+
+\begin{ccode}
+	if (p->pgdir != proc->pgdir)
+	continue;
+\end{ccode}
+
+剩下的和 \texttt{wait} 中大同小异，除了我们需要把线程栈传递给参数 \texttt{stack} 指针指向的指针
+
+\begin{ccode}
+		    
+	int
+	join(void **stack) {
+		struct proc *p;
+		int havekids, pid;
+				
+		// stack should be in proc, which is allocated by malloc
+		if ((proc->sz - (uint)stack) < sizeof(void**))
+		return -1;
+				
+		acquire(&ptable.lock);
+		for(;;){
+			// Scan through table looking for zombie children.
+			// just like wait()
+			havekids = 0;
+			for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+				if(p->parent != proc)
+				continue;
+				if (p->pgdir != proc->pgdir)
+				continue;
+				havekids = 1;
+				if(p->state == ZOMBIE){
+					// Found one.
+					pid = p->pid; cprintf("Found child thread, pid=%d\n", pid);
+					kfree(p->kstack);
+					p->kstack = 0;
+										
+					// but not free the pgdir which is shared by parent process!
+					// freevm(p->pgdir);
+										
+					p->state = UNUSED;
+					p->pid = 0;
+					p->parent = 0;
+					p->name[0] = 0;
+					p->killed = 0;
+					release(&ptable.lock);
+										
+					// The location of the child's user stack is copied into the argument stack.
+					*stack = p->thread_stack;
+					return pid;
+				}
+			}
+						
+			// No point waiting if we don't have any children.
+			if(!havekids || proc->killed){
+				release(&ptable.lock);
+				return -1;
+			}
+						
+			sleep(proc, &ptable.lock);
+		}
+	}
+\end{ccode}
+
+虽然要求中写道 \texttt{join} 要释放内存空间如果子线程是最后一个引用到内存空间的。
+
+\subsection{Code: exit}
+
+\texttt{exit} 原来的功能除了将调用的进程的状态设置为 \texttt{ZOMBIE} 之外，还需要将要退出的子进程的父进程递交给 \texttt{initproc}。
+
+对于要退出的子线程，直接关掉它（将他们也视为调用 \texttt{exit(0)})
+
+\begin{ccode}
+	acquire(&ptable.lock);
+	
+	// Parent might be sleeping in wait().s
+	wakeup1(proc->parent);
+	
+	// Pass abandoned children to init.
+	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+		if(p->parent == proc){
+			if (p->pgdir != proc->pgdir) {
+				// transfer parent attr to initproc
+				p->parent = initproc;
+				if(p->state == ZOMBIE)
+				wakeup1(initproc);
+				} else {
+				// kill all the threads!
+				        
+				p->state = ZOMBIE;
+			}
+		}
+	}
+	
+	// Jump into the scheduler, never to return.
+	proc->state = ZOMBIE;
+	sched();
+	panic("zombie exit");
+\end{ccode}
 
 
 \subsection{Code: thread\_create \& thread\_join}
+
+
+
 
 \subsubsection{why we should use lock}
 
