@@ -20,10 +20,13 @@ typedef union header Header;
 
 static Header base;
 static Header *freep;
+spinlock_t lock_freelist;
+static int in_malloc;
 
 void
 free(void *ap)
 {
+  // spinlock_acquire(&lock_freelist);
   Header *bp, *p;
 
   bp = (Header*)ap - 1;
@@ -41,11 +44,13 @@ free(void *ap)
   } else
     p->s.ptr = bp;
   freep = p;
+  // spinlock_release(&lock_freelist);
 }
 
 static Header*
 morecore(uint nu)
 {
+  if (!in_malloc) spinlock_acquire(&lock_freelist);
   char *p;
   Header *hp;
 
@@ -57,12 +62,15 @@ morecore(uint nu)
   hp = (Header*)p;
   hp->s.size = nu;
   free((void*)(hp + 1));
+  if (!in_malloc) spinlock_release(&lock_freelist);
   return freep;
 }
 
 void*
 malloc(uint nbytes)
 {
+  in_malloc = 1;
+  spinlock_acquire(&lock_freelist);
   Header *p, *prevp;
   uint nunits;
 
@@ -81,10 +89,15 @@ malloc(uint nbytes)
         p->s.size = nunits;
       }
       freep = prevp;
+      spinlock_release(&lock_freelist);
+      in_malloc = 0;
       return (void*)(p + 1);
     }
     if(p == freep)
-      if((p = morecore(nunits)) == 0)
+      if((p = morecore(nunits)) == 0) {
+        spinlock_release(&lock_freelist);
+        in_malloc = 0;
         return 0;
+      }
   }
 }

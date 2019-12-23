@@ -27,47 +27,47 @@ void worker(void *arg_ptr);
 int
 main(int argc, char *argv[])
 {
-   ppid = getpid();
+   // ppid = getpid();
 
-   int arg = 101;
-   void *arg_ptr = &arg;
+   // int arg = 101;
+   // void *arg_ptr = &arg;
 
-   spinlock_init(&lock);
-   spinlock_init(&lock2);
-   spinlock_acquire(&lock);
-   spinlock_acquire(&lock2);
+   // spinlock_init(&lock);
+   // spinlock_init(&lock2);
+   // spinlock_acquire(&lock);
+   // spinlock_acquire(&lock2);
 
-   int i;
-   for (i = 0; i < num_threads; i++) {
-      int thread_pid = thread_create(worker, arg_ptr);
-      assert(thread_pid > 0);
-   }
+   // int i;
+   // for (i = 0; i < num_threads; i++) {
+   //    int thread_pid = thread_create(worker, arg_ptr);
+   //    assert(thread_pid > 0);
+   // }
 
-   size = (unsigned int)sbrk(0);
+   // size = (unsigned int)sbrk(0);
 
-   while (global < num_threads) {
-      spinlock_release(&lock);
-      sleep(100);
-      spinlock_acquire(&lock);
-   }
+   // while (global < num_threads) {
+   //    spinlock_release(&lock);
+   //    sleep(100);
+   //    spinlock_acquire(&lock);
+   // }
 
-   global = 0;
-   sbrk(10000);
-   size = (unsigned int)sbrk(0);
-   spinlock_release(&lock);
+   // global = 0;
+   // sbrk(10000);
+   // size = (unsigned int)sbrk(0);
+   // spinlock_release(&lock);
 
-   while (global < num_threads) {
-      spinlock_release(&lock2);
-      sleep(100);
-      spinlock_acquire(&lock2);
-   }
-   spinlock_release(&lock2);
+   // while (global < num_threads) {
+   //    spinlock_release(&lock2);
+   //    sleep(100);
+   //    spinlock_acquire(&lock2);
+   // }
+   // spinlock_release(&lock2);
 
 
-   for (i = 0; i < num_threads; i++) {
-      int join_pid = thread_join();
-      assert(join_pid > 0);
-   }
+   // for (i = 0; i < num_threads; i++) {
+   //    int join_pid = thread_join();
+   //    assert(join_pid > 0);
+   // }
 
    printf(1, "TEST PASSED\n");
    exit();

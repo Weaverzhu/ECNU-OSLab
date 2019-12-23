@@ -10,6 +10,7 @@
 
 void spinlock_init(spinlock_t *lock)
 {
+    printf(1, "init lock\n");
     *lock = LOCK_FREE;
 }
 
@@ -130,29 +131,17 @@ memmove(void *vdst, void *vsrc, int n)
 int
 thread_create(void (*start_routine)(void*), void *arg) 
 {
-  printf(1, "entering thread_create\n");
-  // return 0;
-  // fork();
-  // critical !!!
-  spinlock_t lock;
-  spinlock_init(&lock);
-  spinlock_acquire(&lock);
-
-  // because the stack is not guaranteed to be page aligned, we need
-  // more size to ensure it is
-  printf(1, "before entering malloc\n");
+  
   void *stack = malloc(4096 * 2);
-  spinlock_release(&lock);
-
   if (stack == NULL) return -1;
 
-  printf(1, "in thread_create, allocated %p-%p", stack, stack + 4096 * 2);
+  // printf(1, "in thread_create, allocated %p-%p", stack, stack + 4096 * 2);
 
   // page roundup, ensure stack is page aligned
   stack = ((uint)stack + 4095) / 4096 * 4096;
-  printf(1, "thread_stack: %p, %p\n", stack, stack + 4096);
+  // printf(1, "thread_stack: %p, %p\n", stack, stack + 4096);
   int pid = clone(start_routine, arg, stack);
-  printf(1, "in father proc: pid=%d\n", pid);
+  // printf(1, "in father proc: pid=%d\n", pid);
   return pid;
 }
 
@@ -163,11 +152,11 @@ thread_join()
   int pid;
   if ((pid = join(&stack)) < 0) return -1;
 
-  spinlock_t lock;
-  spinlock_init(&lock);
-  spinlock_acquire(&lock);
+  // spinlock_t lock;
+  // spinlock_init(&lock);
+  // spinlock_acquire(&lock);
   free(stack);
-  spinlock_release(&lock);
+  // spinlock_release(&lock);
 
   return pid;
 }
