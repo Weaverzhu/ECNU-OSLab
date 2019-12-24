@@ -274,7 +274,8 @@ join(void **stack) {
       havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.
-        pid = p->pid; cprintf("Found child thread, pid=%d\n", pid);
+        pid = p->pid; 
+        // cprintf("Found child thread, pid=%d\n", pid);
         kfree(p->kstack);
         p->kstack = 0;
 
@@ -343,7 +344,7 @@ exit(void)
       } else {
         // kill all the threads!
         
-        p->state = ZOMBIE;
+        // p->state = ZOMBIE;
       }
     }
   }

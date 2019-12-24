@@ -134,14 +134,8 @@ thread_create(void (*start_routine)(void*), void *arg)
   
   void *stack = malloc(4096 * 2);
   if (stack == NULL) return -1;
-
-  // printf(1, "in thread_create, allocated %p-%p", stack, stack + 4096 * 2);
-
-  // page roundup, ensure stack is page aligned
   stack = ((uint)stack + 4095) / 4096 * 4096;
-  // printf(1, "thread_stack: %p, %p\n", stack, stack + 4096);
   int pid = clone(start_routine, arg, stack);
-  // printf(1, "in father proc: pid=%d\n", pid);
   return pid;
 }
 
@@ -152,11 +146,7 @@ thread_join()
   int pid;
   if ((pid = join(&stack)) < 0) return -1;
 
-  // spinlock_t lock;
-  // spinlock_init(&lock);
-  // spinlock_acquire(&lock);
   free(stack);
-  // spinlock_release(&lock);
 
   return pid;
 }
