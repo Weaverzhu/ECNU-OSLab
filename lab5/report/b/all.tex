@@ -189,7 +189,7 @@ x86 执行一个函数的步骤如下：
                     
 \end{ccode}
 
-设置 \texttt{esp, ebp} 到指定的用户栈可以初始化线程的栈空间
+设置 \texttt{esp, ebp} 到指定的用户栈可以初始化线程的栈空间。之前介绍了 c 语言调用函数，参数压栈的方式。按照作业要求，\texttt{start\_routine}只有一个函数参数就是一个包含各种参数的指针 \texttt{arg}。这里返回地址压入的是 \texttt{0xffffffff} fake pc，也就是说一块非法内存地址。当 \texttt{start\_routine} 执行完毕之后会因为访问这个非法的返回地址而被中断 kill 掉，和 xv6 中所有没有执行 \texttt{exit} 的进程一样。所以按照道理来说我们期望用户能在 \texttt{start\_routine} 自行调用 \texttt{exit}，虽然作业要求中这一块没用明确说明。
 
 \begin{ccode}
     // pass arg, args should be just above esp
@@ -304,13 +304,13 @@ x86 执行一个函数的步骤如下：
     }
 \end{ccode}
 
-虽然要求中写道 \texttt{join} 要释放内存空间如果子线程是最后一个引用到内存空间的。
+和 \texttt{wait} 不一样，\texttt{join} 执行的时候地址空间一定会又父进程也就是调用 \texttt{join} 的进程还在引用，所以这里不能释放内存空间
 
 \subsection{Code: exit}
 
 \texttt{exit} 原来的功能除了将调用的进程的状态设置为 \texttt{ZOMBIE} 之外，还需要将要退出的子进程的父进程递交给 \texttt{initproc}。
 
-对于要退出的子线程，直接关掉它（将他们也视为调用 \texttt{exit()})。虽然要求中没有对齐有明确说明，但是这样设计的考量有如下：
+对于要退出的子线程，直接关掉它（将他们也视为调用 \texttt{exit()})。虽然要求中没有对其有明确说明，发邮件询问助教也没有得到答复，但是这样设计的考量有如下：
 
 \begin{itemize}
     \item 如果主进程调用 \texttt{exit()} 退出后状态为 \texttt{ZOMBIE}，它的内存空间随时可能会被它的父进程通过调用 \texttt{wait()} 回收掉，那么主进程的子线程将会莫名其妙的丢失自己的 \texttt{address space}
@@ -427,6 +427,80 @@ x86 执行一个函数的步骤如下：
 \begin{ccode}
     
     extern spinlock_t lock_freelist;
+
+    int
+    main(void)
+    {
+        int pid, wpid;
+        // printf(1, "lock init\n");
+        spinlock_init(&lock_freelist);
+        // printf(1, "lock init completed\n");
+        if(open("console", O_RDWR) < 0){
+\end{ccode}
+
+改变 \texttt{malloc, free} 使得一个地址空间只有一个线程可以访问，也就是禁止多个线程同时访问一个链表
+
+\begin{ccode}
+    
+    void
+    free(void *ap)
+    {
+        // spinlock_acquire(&lock_freelist);
+        Header *bp, *p;
+
+        bp = (Header*)ap - 1;
+        for(p = freep; !(bp > p && bp < p->s.ptr); p = p->s.ptr)
+            if(p >= p->s.ptr && (bp > p || bp < p->s.ptr))
+            break;
+        if(bp + bp->s.size == p->s.ptr){
+            bp->s.size += p->s.ptr->s.size;
+            bp->s.ptr = p->s.ptr->s.ptr;
+        } else
+            bp->s.ptr = p->s.ptr;
+        if(p + p->s.size == bp){
+            p->s.size += bp->s.size;
+            p->s.ptr = bp->s.ptr;
+        } else
+            p->s.ptr = bp;
+        freep = p;
+        // spinlock_release(&lock_freelist);
+    }
+    void*
+    malloc(uint nbytes)
+    {
+        in_malloc = 1;
+        spinlock_acquire(&lock_freelist);
+        Header *p, *prevp;
+        uint nunits;
+
+        nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
+        if((prevp = freep) == 0){
+            base.s.ptr = freep = prevp = &base;
+            base.s.size = 0;
+        }
+        for(p = prevp->s.ptr; ; prevp = p, p = p->s.ptr){
+            if(p->s.size >= nunits){
+            if(p->s.size == nunits)
+                prevp->s.ptr = p->s.ptr;
+            else {
+                p->s.size -= nunits;
+                p += p->s.size;
+                p->s.size = nunits;
+            }
+            freep = prevp;
+            spinlock_release(&lock_freelist);
+            in_malloc = 0;
+            return (void*)(p + 1);
+            }
+            if(p == freep)
+            if((p = morecore(nunits)) == 0) {
+                spinlock_release(&lock_freelist);
+                in_malloc = 0;
+                return 0;
+            }
+        }
+    }
+
 \end{ccode}
 
 
