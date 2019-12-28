@@ -314,7 +314,7 @@ x86 执行一个函数的步骤如下：
 
 \begin{itemize}
     \item 如果主进程调用 \texttt{exit()} 退出后状态为 \texttt{ZOMBIE}，它的内存空间随时可能会被它的父进程通过调用 \texttt{wait()} 回收掉，那么主进程的子线程将会莫名其妙的丢失自己的 \texttt{address space}
-    \item 即使永远不会被回收，那么子线程将没有任何可能回收它们共享的资源。进程可以重新归属于 \texttt{initproc}，但是线程不能，因为这些线程和 \texttt{initproc} 并不共享地址空间
+    \item 如果不 kill，那么子线程将没有任何可能回收它们共享的资源。进程可以重新归属于 \texttt{initproc}，但是线程不能，因为这些线程和 \texttt{initproc} 并不共享地址空间
 \end{itemize}
 
 \begin{ccode}
@@ -503,5 +503,3 @@ x86 执行一个函数的步骤如下：
 
 \end{ccode}
 
-
-\subsection{Test our thread api}
