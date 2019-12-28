@@ -1,19 +1,19 @@
 \subsection{Objectives}
 
 \begin{itemize}
-	\item 使 xv6 支持简单的 thread api
-	\item 仿照 pthread 实现基本线程操作
-	\item 实现两个系统调用 \texttt{int clone} 和 \texttt{int join}，\texttt{clone} 会指定一个函数，及其参数和新线程应有的 \texttt{stack} 空间，然后 \texttt{clone} 为其创建线程，将控制流指向函数，然后放入调度器。\texttt{join} 会等待一个子线程结束运行并且返回得到该线程的栈，用以回收资源
-	\item 实现两个库函数 \texttt{thread\_create} 和 \texttt{thread\_join}，供用户使用
+    \item 使 xv6 支持简单的 thread api
+    \item 仿照 pthread 实现基本线程操作
+    \item 实现两个系统调用 \texttt{int clone} 和 \texttt{int join}，\texttt{clone} 会指定一个函数，及其参数和新线程应有的 \texttt{stack} 空间，然后 \texttt{clone} 为其创建线程，将控制流指向函数，然后放入调度器。\texttt{join} 会等待一个子线程结束运行并且返回得到该线程的栈，用以回收资源
+    \item 实现两个库函数 \texttt{thread\_create} 和 \texttt{thread\_join}，供用户使用
 \end{itemize}
 
 \subsection{Steps}
 
 \begin{itemize}
-	\item 我们实现的线程 \texttt{clone, join} 相当于进程中的 \texttt{fork, wait}。
-	\item 线程有自己栈，但是共享内存空间和打开的设备和文件
-	\item 创建线程和等待线程结束回收资源与 \texttt{fork, wait} 的区别主要在于需要对线程的栈进行操作
-	\item 为线程栈分配空间的时候应该使用 \texttt{lock} 从而避免同时进入线程不安全的 \texttt{malloc}
+    \item 我们实现的线程 \texttt{clone, join} 相当于进程中的 \texttt{fork, wait}。
+    \item 线程有自己栈，但是共享内存空间和打开的设备和文件
+    \item 创建线程和等待线程结束回收资源与 \texttt{fork, wait} 的区别主要在于需要对线程的栈进行操作
+    \item 为线程栈分配空间的时候应该使用 \texttt{lock} 从而避免同时进入线程不安全的 \texttt{malloc}
 \end{itemize}
 
 
@@ -28,11 +28,11 @@
 
 \noindent
 \begin{tabularx}{\textwidth}{|X|X|X|X|X|X|X|X|X|}
-	\hline
-	Register & Accumu-lator & Base & Stack Pointer & Stack Base Pointer & Source & Desti-nation \\ \hline
-	64-bit   & RAX          & RBX  & RSP           & RBP                & RSI    & RDI          \\ \hline
-	32-bit   & EAX          & EBX  & ESP           & EBP                & ESI    & EDI          \\ \hline
-	16-bit   & AX           & BX   & SP            & BP                 & SI     & DI           \\ \hline
+    \hline
+    Register & Accumu-lator & Base & Stack Pointer & Stack Base Pointer & Source & Desti-nation \\ \hline
+    64-bit   & RAX          & RBX  & RSP           & RBP                & RSI    & RDI          \\ \hline
+    32-bit   & EAX          & EBX  & ESP           & EBP                & ESI    & EDI          \\ \hline
+    16-bit   & AX           & BX   & SP            & BP                 & SI     & DI           \\ \hline
 \end{tabularx}
 
 \subsubsection{指令寄存器 (IP)}
@@ -54,25 +54,25 @@ x86 执行一个函数的步骤如下：
 在调用函数的地方：
 
 \begin{enumerate}
-	\item 反序将所有函数参数压入栈中
-	\item 执行 \texttt{call} 指令，会把当前下一条指令压入栈中，然后修改 \texttt{eip} 的值，指向函数的第一条指令
+    \item 反序将所有函数参数压入栈中
+    \item 执行 \texttt{call} 指令，会把当前下一条指令压入栈中，然后修改 \texttt{eip} 的值，指向函数的第一条指令
 \end{enumerate}
 
 于是整个栈空间会变得像这样：
 
 \begin{textcode}
-	Parameter #N
-	...
-	Parameter 2
-	Parameter 1
-	Return Address <--- (%esp)
+    Parameter #N
+    ...
+    Parameter 2
+    Parameter 1
+    Return Address <--- (%esp)
 \end{textcode}
 
 
 在函数里面也有一些事情要做：
 
 \begin{enumerate}
-	\item 保存现在的 \texttt{ebp}，并将其赋值给 \texttt{esp}，这个过程相当于初始化一个栈空间给当前函数
+    \item 保存现在的 \texttt{ebp}，并将其赋值给 \texttt{esp}，这个过程相当于初始化一个栈空间给当前函数
 \end{enumerate}
 
 现在，ebp 往上是函数的参数，ebp往下就是函数自己的栈空间了
@@ -80,38 +80,38 @@ x86 执行一个函数的步骤如下：
 这个时候栈空间的样子：
 
 \begin{textcode}
-	Parameter #N <--- N*4+4(%ebp)
-	...
-	Parameter 2 <--- 12(%ebp)
-	Parameter 1 <--- 8(%ebp)
-	Return Address <--- 4(%ebp)
-	Old %ebp <--- (%esp) and (%ebp)
+    Parameter #N <--- N*4+4(%ebp)
+    ...
+    Parameter 2 <--- 12(%ebp)
+    Parameter 1 <--- 8(%ebp)
+    Return Address <--- 4(%ebp)
+    Old %ebp <--- (%esp) and (%ebp)
 \end{textcode}
 
 \begin{asmcode}
-	subl $8, %esp
+    subl $8, %esp
 \end{asmcode}
 
 之后函数将会给里面的本地变量预留出内存空间，方法就是扩大栈空间，将 \texttt{esp} 向低位移动。如果有两个参数的话那么栈空间是长成这个样子的:
 
 
 \begin{textcode}
-	Parameter #N <--- N*4+4(%ebp)
-	...
-	Parameter 2 <--- 12(%ebp)
-	Parameter 1 <--- 8(%ebp)
-	Return Address <--- 4(%ebp)
-	Old %ebp <--- (%ebp)
-	Local Variable 1 <--- -4(%ebp)
-	Local Variable 2 <--- -8(%ebp) and (%esp)
+    Parameter #N <--- N*4+4(%ebp)
+    ...
+    Parameter 2 <--- 12(%ebp)
+    Parameter 1 <--- 8(%ebp)
+    Return Address <--- 4(%ebp)
+    Old %ebp <--- (%ebp)
+    Local Variable 1 <--- -4(%ebp)
+    Local Variable 2 <--- -8(%ebp) and (%esp)
 \end{textcode}
 
 当函数返回的时候：
 
 \begin{enumerate}
-	\item 返回值存放在 \texttt{eax}
-	\item 将栈回滚到调用这个函数的时候，也就是将 \texttt{ebp, esp} 重置为调用函数之前的值
-	\item 使用 \texttt{ret} 指令将控制流送回，也就是将栈中存放的之前那个下一条指令的值放回 \texttt{eip}
+    \item 返回值存放在 \texttt{eax}
+    \item 将栈回滚到调用这个函数的时候，也就是将 \texttt{ebp, esp} 重置为调用函数之前的值
+    \item 使用 \texttt{ret} 指令将控制流送回，也就是将栈中存放的之前那个下一条指令的值放回 \texttt{eip}
 \end{enumerate}
 
 在 \texttt{clone} 中我们需要直接开始执行 \texttt{start\_routine} 函数，因此要由我们在 \texttt{clone} 系统调用中做好调用函数的工作
@@ -140,7 +140,15 @@ x86 执行一个函数的步骤如下：
 
 \subsubsection{system call}
 
-回顾一下怎么增加一个系统调用，这是我们第一次作业已经做过的
+回顾一下怎么增加一个系统调用，这是我们第一次作业已经做过的，这里不再详细赘述
+
+主要流程就是:
+
+\begin{itemize}
+    \item 在 \texttt{./kernel/syscall.c, ./kernel/sysfunc.h, ./include/syscall.h} 中为我们两个新的 system call 添加新的定义
+    \item 在 \texttt{./user/user.h} 中为用户空间添加定义
+    \item 在 \texttt{./kernel/sysproc.c} 中为函数获取参数，并检查参数传递进来是合法的（使用\texttt{argptr} 等）
+\end{itemize}
 
 
 \subsubsection{clone}
@@ -150,72 +158,72 @@ x86 执行一个函数的步骤如下：
 我们需要为 \texttt{clone} 指定一个新线程的栈。于是这里在构想的时候有两种方案：
 
 \begin{itemize}
-	\item 像上次 xv6 作业那样，在内核态中使用 \texttt{kvalloc} 手动分配分配空间
-	\item 在用户态中使用 \texttt{malloc} 通过 \texttt{clone} 的参数传递
+    \item 像上次 xv6 作业那样，在内核态中使用 \texttt{kvalloc} 手动分配分配空间
+    \item 在用户态中使用 \texttt{malloc} 通过 \texttt{clone} 的参数传递
 \end{itemize}
 
 由于函数的原型已经给出了 \texttt{clone} 中确实包含 \texttt{stack} 这一参数，这里还是采用了第二种方法。而且对于第二种方法，还可以通过加锁的方式控制多个线程同时访问 \texttt{malloc} 或者 \texttt{thread\_join, thread\_create}
 
 \begin{ccode}
-	int i, pid;
-	uint ustack[2];
-	struct proc *np;
-					
-	// check if stack is page-aligned
-	if ((uint)stack % PGSIZE) return -1;
-					
-	// Allocate process
-	if ((np = allocproc()) == 0)
-	return -1;
-					
-	// share the address space
-	np->pgdir = proc->pgdir;
-					
-	// copy as in fork()
-	np->sz = proc->sz;
-	np->parent = proc;
-	*np->tf = *proc->tf;
-					
-	// fake pc
-	ustack[0] = 0xffffffff;
-					
+    int i, pid;
+    uint ustack[2];
+    struct proc *np;
+                    
+    // check if stack is page-aligned
+    if ((uint)stack % PGSIZE) return -1;
+                    
+    // Allocate process
+    if ((np = allocproc()) == 0)
+    return -1;
+                    
+    // share the address space
+    np->pgdir = proc->pgdir;
+                    
+    // copy as in fork()
+    np->sz = proc->sz;
+    np->parent = proc;
+    *np->tf = *proc->tf;
+                    
+    // fake pc
+    ustack[0] = 0xffffffff;
+                    
 \end{ccode}
 
 设置 \texttt{esp, ebp} 到指定的用户栈可以初始化线程的栈空间
 
 \begin{ccode}
-	// pass arg, args should be just above esp
-	ustack[1] = (uint)arg;
-	np->tf->esp = (uint)stack + PGSIZE- sizeof(ustack);
-	// make user stack
-	copyout(np->pgdir, np->tf->esp, ustack, sizeof(ustack));
-	np->thread_stack = stack;
-				  
-	// start executing at the address specified by fcn
-	np->tf->eip = (uint)fcn;
-				  
-	// clearing stack for fcn
-	np->tf->ebp = np->tf->esp;
-				  
-	// Clear %eax so that fork returns 0 in the child.
-	np->tf->eax = 0;
+    // pass arg, args should be just above esp
+    ustack[1] = (uint)arg;
+    np->tf->esp = (uint)stack + PGSIZE- sizeof(ustack);
+    // make user stack
+    copyout(np->pgdir, np->tf->esp, ustack, sizeof(ustack));
+    np->thread_stack = stack;
+                  
+    // start executing at the address specified by fcn
+    np->tf->eip = (uint)fcn;
+                  
+    // clearing stack for fcn
+    np->tf->ebp = np->tf->esp;
+                  
+    // Clear %eax so that fork returns 0 in the child.
+    np->tf->eax = 0;
 \end{ccode}
 
 \texttt{file descriptor, proc->state} 等同样参照 \texttt{fork}
 
 \begin{ccode}
-	// file descriptors are copied as in fork
-	for(i = 0; i < NOFILE; i++)
-	if(proc->ofile[i])
-	np->ofile[i] = filedup(proc->ofile[i]);
-	np->cwd = idup(proc->cwd);
-				   
-	pid = np->pid;
-	np->state = RUNNABLE;
-	safestrcpy(np->name, proc->name, sizeof(proc->name));
-	// cprintf("dbg: clone completed!, pid=%d, np->tf->eip=%p\n", pid, np->tf->eip);
-	// procdump();
-	return pid;
+    // file descriptors are copied as in fork
+    for(i = 0; i < NOFILE; i++)
+    if(proc->ofile[i])
+    np->ofile[i] = filedup(proc->ofile[i]);
+    np->cwd = idup(proc->cwd);
+                   
+    pid = np->pid;
+    np->state = RUNNABLE;
+    safestrcpy(np->name, proc->name, sizeof(proc->name));
+    // cprintf("dbg: clone completed!, pid=%d, np->tf->eip=%p\n", pid, np->tf->eip);
+    // procdump();
+    return pid;
 \end{ccode}
 
 \subsubsection{wait \& join}
@@ -227,73 +235,73 @@ x86 执行一个函数的步骤如下：
 在 \texttt{wait} 当中我们需要添加
 
 \begin{ccode}
-	// we do not clear threads!!!
-	if (p->pgdir == proc->pgdir)
-	continue;
+    // we do not clear threads!!!
+    if (p->pgdir == proc->pgdir)
+    continue;
 \end{ccode}
 
 在 \texttt{join} 中我们也需要排除是子进程的情况
 
 \begin{ccode}
-	if (p->pgdir != proc->pgdir)
-	continue;
+    if (p->pgdir != proc->pgdir)
+    continue;
 \end{ccode}
 
 剩下的和 \texttt{wait} 中大同小异，除了我们需要把线程栈传递给参数 \texttt{stack} 指针指向的指针
 
 \begin{ccode}
-				    
-	int
-	join(void **stack) {
-		struct proc *p;
-		int havekids, pid;
-								
-		// stack should be in proc, which is allocated by malloc
-		if ((proc->sz - (uint)stack) < sizeof(void**))
-		return -1;
-								
-		acquire(&ptable.lock);
-		for(;;){
-			// Scan through table looking for zombie children.
-			// just like wait()
-			havekids = 0;
-			for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-				if(p->parent != proc)
-				continue;
-				if (p->pgdir != proc->pgdir)
-				continue;
-				havekids = 1;
-				if(p->state == ZOMBIE){
-					// Found one.
-					pid = p->pid; cprintf("Found child thread, pid=%d\n", pid);
-					kfree(p->kstack);
-					p->kstack = 0;
-																				
-					// but not free the pgdir which is shared by parent process!
-					// freevm(p->pgdir);
-																				
-					p->state = UNUSED;
-					p->pid = 0;
-					p->parent = 0;
-					p->name[0] = 0;
-					p->killed = 0;
-					release(&ptable.lock);
-																				
-					// The location of the child's user stack is copied into the argument stack.
-					*stack = p->thread_stack;
-					return pid;
-				}
-			}
-												
-			// No point waiting if we don't have any children.
-			if(!havekids || proc->killed){
-				release(&ptable.lock);
-				return -1;
-			}
-												
-			sleep(proc, &ptable.lock);
-		}
-	}
+                    
+    int
+    join(void **stack) {
+        struct proc *p;
+        int havekids, pid;
+                                
+        // stack should be in proc, which is allocated by malloc
+        if ((proc->sz - (uint)stack) < sizeof(void**))
+        return -1;
+                                
+        acquire(&ptable.lock);
+        for(;;){
+            // Scan through table looking for zombie children.
+            // just like wait()
+            havekids = 0;
+            for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+                if(p->parent != proc)
+                continue;
+                if (p->pgdir != proc->pgdir)
+                continue;
+                havekids = 1;
+                if(p->state == ZOMBIE){
+                    // Found one.
+                    pid = p->pid; cprintf("Found child thread, pid=%d\n", pid);
+                    kfree(p->kstack);
+                    p->kstack = 0;
+                                                                                
+                    // but not free the pgdir which is shared by parent process!
+                    // freevm(p->pgdir);
+                                                                                
+                    p->state = UNUSED;
+                    p->pid = 0;
+                    p->parent = 0;
+                    p->name[0] = 0;
+                    p->killed = 0;
+                    release(&ptable.lock);
+                                                                                
+                    // The location of the child's user stack is copied into the argument stack.
+                    *stack = p->thread_stack;
+                    return pid;
+                }
+            }
+                                                
+            // No point waiting if we don't have any children.
+            if(!havekids || proc->killed){
+                release(&ptable.lock);
+                return -1;
+            }
+                                                
+            sleep(proc, &ptable.lock);
+        }
+    }
 \end{ccode}
 
 虽然要求中写道 \texttt{join} 要释放内存空间如果子线程是最后一个引用到内存空间的。
@@ -305,36 +313,36 @@ x86 执行一个函数的步骤如下：
 对于要退出的子线程，直接关掉它（将他们也视为调用 \texttt{exit()})。虽然要求中没有对齐有明确说明，但是这样设计的考量有如下：
 
 \begin{itemize}
-	\item 如果主进程调用 \texttt{exit()} 退出后状态为 \texttt{ZOMBIE}，它的内存空间随时可能会被它的父进程通过调用 \texttt{wait()} 回收掉，那么主进程的子线程将会莫名其妙的丢失自己的 \texttt{address space}
-	\item 即使永远不会被回收，那么子线程将没有任何可能回收它们共享的资源。进程可以重新归属于 \texttt{initproc}，但是线程不能，因为这些线程和 \texttt{initproc} 并不共享地址空间
+    \item 如果主进程调用 \texttt{exit()} 退出后状态为 \texttt{ZOMBIE}，它的内存空间随时可能会被它的父进程通过调用 \texttt{wait()} 回收掉，那么主进程的子线程将会莫名其妙的丢失自己的 \texttt{address space}
+    \item 即使永远不会被回收，那么子线程将没有任何可能回收它们共享的资源。进程可以重新归属于 \texttt{initproc}，但是线程不能，因为这些线程和 \texttt{initproc} 并不共享地址空间
 \end{itemize}
 
 \begin{ccode}
-	acquire(&ptable.lock);
-			
-	// Parent might be sleeping in wait().s
-	wakeup1(proc->parent);
-			
-	// Pass abandoned children to init.
-	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-		if(p->parent == proc){
-			if (p->pgdir != proc->pgdir) {
-				// transfer parent attr to initproc
-				p->parent = initproc;
-				if(p->state == ZOMBIE)
-				wakeup1(initproc);
-				} else {
-				// kill all the threads!
-												        
-				p->state = ZOMBIE;
-			}
-		}
-	}
-			
-	// Jump into the scheduler, never to return.
-	proc->state = ZOMBIE;
-	sched();
-	panic("zombie exit");
+    acquire(&ptable.lock);
+            
+    // Parent might be sleeping in wait().s
+    wakeup1(proc->parent);
+            
+    // Pass abandoned children to init.
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->parent == proc){
+            if (p->pgdir != proc->pgdir) {
+                // transfer parent attr to initproc
+                p->parent = initproc;
+                if(p->state == ZOMBIE)
+                wakeup1(initproc);
+                } else {
+                // kill all the threads!
+                                                        
+                p->state = ZOMBIE;
+            }
+        }
+    }
+            
+    // Jump into the scheduler, never to return.
+    proc->state = ZOMBIE;
+    sched();
+    panic("zombie exit");
 \end{ccode}
 
 
@@ -347,38 +355,79 @@ x86 执行一个函数的步骤如下：
 然后我们调用 \texttt{clone}，并且分配一个 \texttt{malloc} 用作线程栈，传递函数指针
 
 \begin{ccode}
-	int
-	thread_create(void (*start_routine)(void*), void *arg) 
-	{
-				  
-		void *stack = malloc(4096 * 2);
-		if (stack == NULL) return -1;
-		stack = ((uint)stack + 4095) / 4096 * 4096;
-		int pid = clone(start_routine, arg, stack);
-		return pid;
-	}
+    int
+    thread_create(void (*start_routine)(void*), void *arg) 
+    {
+                  
+        void *stack = malloc(4096 * 2);
+        if (stack == NULL) return -1;
+        stack = ((uint)stack + 4095) / 4096 * 4096;
+        int pid = clone(start_routine, arg, stack);
+        return pid;
+    }
 \end{ccode}
 
 对于 \texttt{join}，我们回收之前扔进去的线程栈
 
 \begin{ccode}
-	int
-	thread_join()
-	{
-		void *stack = malloc(sizeof(void*));
-		int pid;
-		if ((pid = join(&stack)) < 0) return -1;
-		
-		free(stack);
-		
-		return pid;
-	}
+    int
+    thread_join()
+    {
+        void *stack = malloc(sizeof(void*));
+        int pid;
+        if ((pid = join(&stack)) < 0) return -1;
+        
+        free(stack);
+        
+        return pid;
+    }
 \end{ccode}
-
 
 
 \subsection{Code: add spinlock on malloc \& free}
 
+还有一个关键的问题，就是多个线程同时改变自己的 \texttt{address space} 比如调用 \texttt{malloc, free} 等。\texttt{sbrk} 属于系统调用，内核态如果只有一个单元进入的话不会发生竞争情况，但是 \texttt{malloc, free} 读取的是一个在用户空间中的共享链表（见 \texttt{./user/umalloc.c}）。我们为每次读写链表都加锁
+
+这里直接从上一次实验复制了一个自旋锁
+
+\begin{ccode}
+    typedef struct __lock_t { int flag; } lock_t;
+
+    typedef volatile unsigned int spinlock_t;
+
+    void spinlock_init(spinlock_t *lock);
+    void spinlock_acquire(spinlock_t *lock);
+    void spinlock_release(spinlock_t *lock);
+
+    #define LOCK_ACQUIRED 1
+    #define LOCK_FREE 0
+
+    void spinlock_init(spinlock_t *lock)
+    {
+        printf(1, "init lock\n");
+        *lock = LOCK_FREE;
+    }
+
+    void spinlock_acquire(spinlock_t *lock)
+    {
+        while (*lock || xchg(lock, LOCK_ACQUIRED))
+        {
+            asm("pause");
+        }
+    }
+
+    void spinlock_release(spinlock_t *lock)
+    {
+        *lock = LOCK_FREE;
+    }
+\end{ccode}
+
+在 \texttt{init} 程序中初始化锁
+
+\begin{ccode}
+    
+    extern spinlock_t lock_freelist;
+\end{ccode}
 
 
 \subsection{Test our thread api}

@@ -14,7 +14,7 @@ main(void)
 {
   int pid, wpid;
   // printf(1, "lock init\n");
-  // spinlock_init(&lock_freelist);
+  spinlock_init(&lock_freelist);
   // printf(1, "lock init completed\n");
   if(open("console", O_RDWR) < 0){
     mknod("console", 1, 1);

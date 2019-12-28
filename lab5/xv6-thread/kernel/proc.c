@@ -344,7 +344,7 @@ exit(void)
       } else {
         // kill all the threads!
         
-        // p->state = ZOMBIE;
+        p->state = ZOMBIE;
       }
     }
   }
